@@ -1,0 +1,16 @@
+name: test_robustDA
+channels:
+    - conda-forge
+    - defaults
+dependencies:
+    - python=3.8
+    - anaconda
+    - pip
+    - numpy
+    - jupyter
+    - matplotlib
+    - pandas
+    - scikit-learn
+    - netCDF4
+    - cartopy
+    

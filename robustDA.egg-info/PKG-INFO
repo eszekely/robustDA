@@ -1,0 +1,10 @@
+Metadata-Version: 1.2
+Name: robustDA
+Version: 0.0.1
+Summary: Robust detection and attribution
+Home-page: UNKNOWN
+Author: My name
+License: UNKNOWN
+Description: Robust detection and attribution
+Platform: UNKNOWN
+Requires-Python: >=3.7

@@ -1,0 +1,3 @@
+# exclude mounted files and output files
+/data/mount
+/output
