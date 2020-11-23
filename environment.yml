@@ -1,4 +1,4 @@
-name: test_robustDA
+name: robustDA
 channels:
     - conda-forge
     - defaults
