@@ -3,8 +3,10 @@
 import numpy as np
 import pandas as pd
 
+from copy import deepcopy
 from sklearn.preprocessing import StandardScaler
 from sklearn import linear_model
+from sklearn.feature_selection import mutual_info_regression
 from scipy import stats
 
 from robustDA.process_cmip6 import read_files_cmip6
@@ -60,7 +62,9 @@ def build_column_space(y_anchor, h_anchors):
 
     if len(h_anchors) > 0:
         for i in range(len(h_anchors)):
-            A_h[:, i + 1] = helpers.nonlinear_anchors(y_anchor, h_anchors[i]).reshape(-1)
+            A_h[:, i + 1] = helpers.nonlinear_anchors(
+                y_anchor, h_anchors[i]
+            ).reshape(-1)
 
     A_h = np.mat(A_h)  # needed for matrix multiplication
     PA = A_h * np.linalg.inv(np.transpose(A_h) * A_h) * np.transpose(A_h)
@@ -92,7 +96,9 @@ def transformed_anchor_matrices(X, y, y_anchor, gamma, h_anchors):
     return X_PA, y_PA
 
 
-def anchor_regression_estimator(dict_models, gamma, h_anchors, regLambda, method="ridge"):
+def anchor_regression_estimator(
+    dict_models, gamma, h_anchors, regLambda, method="ridge"
+):
     """ Standardize the data before anchor regression """
     X, y, y_anchor, Xt, yt, yt_anchor, std_X_train = standardize(dict_models)
 
@@ -132,8 +138,10 @@ def anchor_regression_estimator(dict_models, gamma, h_anchors, regLambda, method
         coefRaw = coefStd.T / np.array(std_X_train).reshape(p, 1)
 
         y_test_pred = np.array(np.matmul(Xt, coefStd.T))
+        
+    mse = np.mean((yt - y_test_pred) ** 2)
 
-    return coefRaw, y_test_pred
+    return coefRaw, y_test_pred, mse
 
 
 def run_anchor_regression_all(
@@ -144,7 +152,7 @@ def run_anchor_regression_all(
     anchor = params_climate["anchor"]
     gamma = params_anchor["gamma"]
     h_anchors = params_anchor["h_anchors"]
-    
+
     modelsDataList, modelsInfoFrame = read_files_cmip6(
         params_climate, norm=True
     )
@@ -155,7 +163,7 @@ def run_anchor_regression_all(
 
     print(dict_models["trainModels"])
     print(dict_models["testModels"])
-    
+
     for i in range(len(gamma)):
         print("Gamma: " + str(gamma[i]))
 
@@ -168,14 +176,15 @@ def run_anchor_regression_all(
                 params_climate,
                 gamma[i],
                 tmp_h_anchors,
-                display_CV_plot,) 
-       
-        else: # gamma different from 1
-            """ Run anchor regression with the 
+                display_CV_plot,
+            )
+
+        else:  # gamma different from 1
+            """Run anchor regression with the
             nonlinear anchors
             """
             for j in range(len(h_anchors) + 1):
-                tmp_h_anchors = h_anchors[: j]
+                tmp_h_anchors = h_anchors[:j]
                 print(" ---- " + str(tmp_h_anchors))
                 run_anchor_regression(
                     modelsDataList,
@@ -184,9 +193,10 @@ def run_anchor_regression_all(
                     params_climate,
                     gamma[i],
                     tmp_h_anchors,
-                    display_CV_plot,) 
+                    display_CV_plot,
+                )
 
-                
+
 def run_anchor_regression(
     modelsDataList,
     modelsInfoFrame,
@@ -196,36 +206,41 @@ def run_anchor_regression(
     h_anchors,
     display_CV_plot,
 ):
+
+    cv_vals = 30
     
     lambdaSelAll, _, _ = cross_validation_anchor_regression(
         modelsDataList,
         modelsInfoFrame,
-        dict_models,
+        deepcopy(dict_models),
         params_climate,
         gamma,
         h_anchors,
+        cv_vals,
         display_CV_plot,
     )
 
+    nbSem = 1
     anchor_regression(
-        dict_models, gamma, h_anchors, lambdaSelAll[1], params_climate, 1
+        dict_models, gamma, h_anchors, lambdaSelAll[nbSem], params_climate, nbSem
     )
 
+    nbSem = 2
     anchor_regression(
-        dict_models, gamma, h_anchors, lambdaSelAll[2], params_climate, 2
+        dict_models, gamma, h_anchors, lambdaSelAll[nbSem], params_climate, nbSem
     )
 
-    
+
 def anchor_regression(
     dict_models,
     gamma,
     h_anchors,
     lambdaSel,
-    params_climate, 
+    params_climate,
     nbSem,
 ):
-    
-    coefRaw, y_test_pred = anchor_regression_estimator(
+
+    coefRaw, y_test_pred, mse = anchor_regression_estimator(
         dict_models, gamma, h_anchors, lambdaSel
     )
 
@@ -248,7 +263,7 @@ def anchor_regression(
         + str(gamma)
         + "_"
         + "nonlinear-h_"
-        + str(len(h_anchors)) 
+        + str(len(h_anchors))
         + "-".join(h_anchors)
         + "_"
         + "lambda_"
@@ -269,8 +284,8 @@ def anchor_regression(
         h_anchors,
         filename,
     )
-            
-                
+
+
 def cross_validation_anchor_regression(
     modelsDataList,
     modelsInfoFrame,
@@ -278,6 +293,7 @@ def cross_validation_anchor_regression(
     params_climate,
     gamma,
     h_anchors,
+    cv_lambda_vals,
     display_CV_plot=False,
 ):
 
@@ -298,10 +314,12 @@ def cross_validation_anchor_regression(
         displayModels=False,
     )
 
-    lambdasCV = np.logspace(-2, 6, 100)
+    lambdasCV = np.logspace(-2, 6, cv_lambda_vals)
 
     nbFoldsCV = len(dict_folds["foldsData"])
     mse = np.zeros([len(lambdasCV), nbFoldsCV])
+    corr_pearson = np.zeros([len(lambdasCV), nbFoldsCV])
+    mi = np.zeros([len(lambdasCV), nbFoldsCV])
 
     for i in range(nbFoldsCV):
         X_val_df = dict_folds["foldsData"][i]
@@ -325,7 +343,7 @@ def cross_validation_anchor_regression(
                     axis=0,
                 )
 
-        dict_models = {
+        dict_models_CV = {
             #             "trainModels": trainModels,
             #             "testModels": testModels,
             #             "trainFiles": trainFiles,
@@ -346,15 +364,26 @@ def cross_validation_anchor_regression(
             y_val_true,
             y_anchor_val,
             std_X_train,
-        ) = standardize(dict_models)
+        ) = standardize(dict_models_CV)
 
-        X_PA, y_PA = transformed_anchor_matrices(X, y, y_anchor, gamma, h_anchors)
+        X_PA, y_PA = transformed_anchor_matrices(
+            X, y, y_anchor, gamma, h_anchors
+        )
 
         for j in range(len(lambdasCV)):
             regr = linear_model.Ridge(alpha=X.shape[0] * lambdasCV[j] / 2)
             regr.fit(X_PA, y_PA)
             y_val_pred = regr.predict(X_val)
+            residuals = (y_val_true - y_val_pred).reshape(-1)
+            
             mse[j][i] = np.mean((y_val_true - y_val_pred) ** 2)
+            corr_pearson[j][i] = np.round(
+                np.corrcoef(np.transpose(y_anchor_val), np.transpose(residuals))[
+                    0, 1
+                ],
+                2,
+            )
+            mi[j][i] = np.round(mutual_info_regression(y_anchor_val, residuals)[0], 2)
 
     columnNames = ["MSE - Fold " + str(i) for i in range(nbFoldsCV)]
     mse_df = pd.DataFrame(mse, index=lambdasCV, columns=columnNames)
@@ -383,15 +412,15 @@ def cross_validation_anchor_regression(
             + str(gamma)
             + "_"
             + "nonlinear-h_"
-            + str(len(h_anchors)) 
+            + str(len(h_anchors))
             + "-".join(h_anchors)
             + "_CV.pdf"
         )
-        plot_CV(mse_df, lambdasSelAll, sem_CV, filename)
+        plot_CV(mse_df, lambdasSelAll, sem_CV, filename, dict_folds["trainFolds"])
 
     # mse_df.to_csv("./../output/data/MSE_rcp85_norm_train30_cv5_lambda0_5_100.csv")
 
-    return lambdasSelAll, mse_df, sem_CV
+    return lambdasSelAll, mse_df, sem_CV, corr_pearson, mi
 
 
 def choose_lambda(mse_df, lambdasCV):
@@ -425,3 +454,89 @@ def choose_lambda(mse_df, lambdasCV):
         lambdasSelAll[j + 1] = lambdaSel
 
     return lambdasSelAll, sem_CV
+
+
+def subagging(modelsDataList, modelsInfoFrame, params_climate, params_anchor, nbRuns):
+    grid = (72, 144)
+    mse_runs = np.zeros([nbRuns, 1])
+    coefRaw_runs = np.zeros([nbRuns, grid[0]*grid[1]])
+    lambdaSel_runs = np.zeros([nbRuns, 1])
+    trainFiles = []
+    testFiles = []
+
+    for r in range(nbRuns):
+        print("---- Run = " + str(r) + " ----")
+
+        dict_models = split_train_test(modelsDataList, modelsInfoFrame, 
+                                              params_climate["target"], params_climate["anchor"])
+
+        print(dict_models['trainModels'])
+        print(dict_models['testModels'])
+
+        trainFiles.append(dict_models["trainFiles"])
+        testFiles.append(dict_models["testFiles"])
+
+        gamma = params_anchor["gamma"]
+        h_anchors = params_anchor["h_anchors"]
+        
+        cv_vals = 30
+        display_CV_plot = False
+        lambdaSelAll, mse_df, sem_CV = cross_validation_anchor_regression(
+            modelsDataList,
+            modelsInfoFrame,
+            deepcopy(dict_models),
+            params_climate,
+            gamma,
+            h_anchors,
+            cv_vals,
+            display_CV_plot,
+        )
+
+        """ Train with the chosen lambda to learn the coefficients beta, 
+        and get the error of each run by testing with the test set
+        """
+
+        nbSem = 2
+        coefRaw, y_test_pred, mse = anchor_regression_estimator(
+            dict_models, gamma, h_anchors, lambdaSelAll[nbSem]
+        )
+
+        lambdaSel_runs[r] = lambdaSelAll[nbSem]
+        mse_runs[r] = mse
+        coefRaw_runs[r, :] = coefRaw
+
+    mse_runs_df = pd.DataFrame(mse_runs, columns = ['MSE'])
+    mse_runs_df['Lambda selected'] = pd.DataFrame(lambdaSel_runs)
+    mse_runs_df.index.name = 'Run'
+
+    coefRaw_final = np.sum(coefRaw_runs, axis = 0).reshape(-1,1)
+
+    #mse_df.to_csv("./../output/data/MSE_rcp85_norm_train30_cv5_lambda0_5_100.csv")
+
+    return coefRaw_final, coefRaw_runs, mse_runs_df, trainFiles, testFiles
+
+
+def param_optimization_gamma_lambda(
+    modelsDataList, modelsInfoFrame, dict_models, params_climate, gamma_vals, cv_vals, h_anchors):
+    
+    mse_gamma = np.zeros([len(gamma_vals), cv_vals])
+    corr_gamma = np.zeros([len(gamma_vals), cv_vals])
+    mi_gamma = np.zeros([len(gamma_vals), cv_vals])
+    
+    for i in range(len(gamma_vals)):
+        lambdaSelAll, mse_df, sem_CV, corr_pearson, mi = cross_validation_anchor_regression(
+            modelsDataList,
+            modelsInfoFrame,
+            deepcopy(dict_models),
+            params_climate,
+            gamma_vals[i],
+            h_anchors,
+            cv_vals,
+            display_CV_plot = False,
+        )
+        
+        mse_gamma[i,:] = mse_df.iloc[:,-1].values
+        corr_gamma[i,:] = np.nanmean(corr_pearson, axis = 1)
+        mi_gamma[i,:] = np.mean(mi, axis = 1)
+    
+    return mse_gamma, corr_gamma, mi_gamma  

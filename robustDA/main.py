@@ -25,12 +25,7 @@ from anchor_regression import run_anchor_regression_all
 from parse_args import args_climate, args_anchor
 
 
-def main(params_climate, params_anchor):
-
-    run_anchor_regression_all(params_climate, params_anchor, display_CV_plot = True)
-
-
-if __name__ == "__main__":
+def parser_args():
     parser = argparse.ArgumentParser()
     
     parser.add_argument("--target", help="The target forcing you want to predict")
@@ -42,4 +37,14 @@ if __name__ == "__main__":
     params_climate = args_climate(args)
     params_anchor = args_anchor(args)
     
+    return params_climate, params_anchor
+
+
+def main(params_climate, params_anchor):
+
+    run_anchor_regression_all(params_climate, params_anchor, display_CV_plot = True)
+
+
+if __name__ == "__main__":
+    params_climate, params_anchor = parser_args()
     main(params_climate, params_anchor)

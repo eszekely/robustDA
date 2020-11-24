@@ -243,7 +243,7 @@ def make_plots(
     plt.close()
 
 
-def plot_CV(mse_df, lambdasSelAll, sem_CV, filename):
+def plot_CV(mse_df, lambdasSelAll, sem_CV, filename, folds):
     nbStd = np.array([1, 2, 3])
     clr = ["r", "b", "k"]
 
@@ -256,6 +256,7 @@ def plot_CV(mse_df, lambdasSelAll, sem_CV, filename):
 
     for i in range(mse_df.shape[1] - 1):
         ax1.plot(mse_df.index, mse_df.iloc[:, i], label="_nolegend_")
+#         ax1.plot(mse_df.index, mse_df.iloc[:, i], label=folds[i])
 
     ax1.plot(mse_df.index, mse_df.iloc[:, i + 1], "k.-")
 

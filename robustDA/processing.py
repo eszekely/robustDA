@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import random
 
+from copy import deepcopy
 from sklearn.preprocessing import StandardScaler
 
 from robustDA.process_cmip6 import read_forcing_cmip6, compute_forced_response_cmip6
@@ -40,15 +41,14 @@ def split_train_test(
         models = sorted(set([modelsDataList[i].model for i in range(nbFiles)]))
 
         """ Split the models """
-        trainModels = list(
-            np.sort(
+        trainModels = np.sort(
                 list(
                     random.sample(
                         models, int(np.round(percTrain * len(models)))
                     )
                 )
             )
-        )
+
         trainFiles = [
             modelsDataList[i].filename
             for i in range(nbFiles)
@@ -60,7 +60,8 @@ def split_train_test(
             if modelsDataList[i].model in trainModels
         ]
 
-        testModels = list(set(models) - set(trainModels))
+        testModels = np.sort(list(set(models) - set(trainModels)))
+
         testFiles = [
             modelsDataList[i].filename
             for i in range(nbFiles)
@@ -101,15 +102,13 @@ def split_train_test(
         )
 
         """ Split the models """
-        trainModels = list(
-            np.sort(
+        trainModels = np.sort(
                 list(
                     random.sample(
                         models, int(np.round(percTrain * len(models)))
                     )
                 )
             )
-        )
         trainFiles = [
             modelsDataList[i].filename
             for i in range(nbFiles)
@@ -123,7 +122,7 @@ def split_train_test(
             and modelsDataList[i].modelFull in modelsFull_forcedResponse
         ]
 
-        testModels = list(set(models) - set(trainModels))
+        testModels = np.sort(list(set(models) - set(trainModels)))
         testFiles = [
             modelsDataList[i].filename
             for i in range(nbFiles)
@@ -373,7 +372,8 @@ def split_folds_CV(
     ]
     forcedResponses = ["hist-aer", "hist-GHG", "hist-nat"]
 
-    trainFolds = partition(dict_models["trainModels"], nbFoldsCV)
+    dict_copy = deepcopy(dict_models)
+    trainFolds = partition(dict_copy["trainModels"], nbFoldsCV)
 
     #     forcedResponse_df = computeForcedResponse_CMIP6(
     #         variables, temporalRes, scenario, startDate, endDate, norm
@@ -472,6 +472,7 @@ def split_folds_CV(
         "foldsData": foldsData,
         "foldsTarget": foldsTarget,
         "foldsAnchor": foldsAnchor,
+        "trainFolds": trainFolds,
     }
 
     return dict_folds
