@@ -2,6 +2,7 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 import cartopy.crs as ccrs
 
 from sklearn.feature_selection import mutual_info_regression
@@ -240,7 +241,7 @@ def make_plots(
             bbox_inches="tight",
         )
         
-    plt.close()
+#     plt.close()
 
 
 def plot_CV(mse_df, lambdasSelAll, sem_CV, filename, folds):
@@ -297,6 +298,8 @@ def plot_CV(mse_df, lambdasSelAll, sem_CV, filename, folds):
     ax2.set_yscale("log")
     ax2.set_xlabel("$\\lambda$", fontsize=14)
     
+    if not os.path.isdir("./../output/figures/"):
+        os.makedirs("./../output/figures/")
     fig.savefig("./../output/figures/" + filename, bbox_inches="tight")
     
-    plt.close()
+#     plt.close()

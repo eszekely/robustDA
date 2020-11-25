@@ -2,6 +2,8 @@
 
 import numpy as np
 import pandas as pd
+import pickle
+import os
 
 from copy import deepcopy
 from sklearn.preprocessing import StandardScaler
@@ -538,5 +540,12 @@ def param_optimization_gamma_lambda(
         mse_gamma[i,:] = mse_df.iloc[:,-1].values
         corr_gamma[i,:] = np.nanmean(corr_pearson, axis = 1)
         mi_gamma[i,:] = np.mean(mi, axis = 1)
+    
+    if not os.path.isdir("./../output/data/"):
+        os.makedirs("./../output/data/")
+    filename = "./../output/data/params_optimization_" \
+        + params_climate["target"] + "_" + params_climate["anchor"] + ".pkl"
+    with open(filename, "wb") as f:
+        pickle.dump([mse_gamma, corr_gamma, mi_gamma], f)
     
     return mse_gamma, corr_gamma, mi_gamma  
