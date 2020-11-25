@@ -153,8 +153,28 @@ def read_files_cmip6(params_climate, norm = True):
         modelsInfoFrame.iloc[i, 4] = modelsDataList[i].model
         modelsInfoFrame.iloc[i, 5] = modelsDataList[i].scenario
         modelsInfoFrame.iloc[i, 6] = modelsDataList[i].spatialRes
+        
+    """ Remove models that only have piControl runs """
+    nbFiles = len(modelsDataList)
+    models = sorted(set([modelsDataList[i].model for i in range(nbFiles)]))
+    modelsRemove = set()
 
-    return modelsDataList, modelsInfoFrame
+    for i in range(len(models)):
+        scenarios = [
+                modelsDataList[j].scenario
+                for j in range(nbFiles)
+                    if modelsDataList[j].model == models[i]
+            ]
+        if set(scenarios) == set(['piControl']):
+            modelsRemove.add(models[i])
+
+    modelsDataList_final = [modelsDataList[i] for i in range(len(modelsDataList)) 
+                            if modelsDataList[i].model not in modelsRemove]
+    ind = [i for i in range(modelsInfoFrame.shape[0]) if modelsInfoFrame.loc[i]["model"] in modelsRemove]
+    modelsInfoFrame = modelsInfoFrame.drop(ind)
+    modelsInfoFrame = modelsInfoFrame.reset_index(drop = True)
+
+    return modelsDataList_final, modelsInfoFrame
 
 
 def read_forcing_cmip6(scenario, forcing, startDate, endDate):

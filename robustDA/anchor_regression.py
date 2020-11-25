@@ -209,9 +209,9 @@ def run_anchor_regression(
     display_CV_plot,
 ):
 
-    cv_vals = 30
+    cv_vals = 50
     
-    lambdaSelAll, _, _ = cross_validation_anchor_regression(
+    lambdaSelAll, mse_df, sem_CV, corr_pearson, mi = cross_validation_anchor_regression(
         modelsDataList,
         modelsInfoFrame,
         deepcopy(dict_models),

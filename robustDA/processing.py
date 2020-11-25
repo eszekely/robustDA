@@ -37,7 +37,7 @@ def split_train_test(
     use only models that have the correponding forced response.
     Use modelFull for computing the forced response, not just model.
     """
-    if target in forcings:
+    if target in forcings: # sorted not needed
         models = sorted(set([modelsDataList[i].model for i in range(nbFiles)]))
 
         """ Split the models """
