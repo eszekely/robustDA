@@ -518,34 +518,111 @@ def subagging(modelsDataList, modelsInfoFrame, params_climate, params_anchor, nb
     return coefRaw_final, coefRaw_runs, mse_runs_df, trainFiles, testFiles
 
 
-def param_optimization_gamma_lambda(
-    modelsDataList, modelsInfoFrame, dict_models, params_climate, gamma_vals, cv_vals, h_anchors):
+def param_optimization(params_climate, params_anchor):
     
-    mse_gamma = np.zeros([len(gamma_vals), cv_vals])
-    corr_gamma = np.zeros([len(gamma_vals), cv_vals])
-    mi_gamma = np.zeros([len(gamma_vals), cv_vals])
+    target = params_climate["target"]
+    anchor = params_climate["anchor"]
+    gamma_vals = params_anchor["gamma"]
+    h_anchors = params_anchor["h_anchors"]
+
+    cv_vals = 50
+    lambdaCV = np.logspace(-2, 6, cv_vals)
+    mse_gamma = np.zeros([len(gamma_vals), len(h_anchors) + 1, cv_vals])
+    corr_gamma = np.zeros([len(gamma_vals), len(h_anchors) + 1, cv_vals])
+    mi_gamma = np.zeros([len(gamma_vals), len(h_anchors) + 1, cv_vals])
+    
+
+    modelsDataList, modelsInfoFrame = read_files_cmip6(
+        params_climate, norm=True
+    )
+
+    dict_models = split_train_test(
+        modelsDataList, modelsInfoFrame, target, anchor
+    )
     
     for i in range(len(gamma_vals)):
-        lambdaSelAll, mse_df, sem_CV, corr_pearson, mi = cross_validation_anchor_regression(
-            modelsDataList,
-            modelsInfoFrame,
-            deepcopy(dict_models),
-            params_climate,
-            gamma_vals[i],
-            h_anchors,
-            cv_vals,
-            display_CV_plot = False,
-        )
-        
-        mse_gamma[i,:] = mse_df.iloc[:,-1].values
-        corr_gamma[i,:] = np.nanmean(corr_pearson, axis = 1)
-        mi_gamma[i,:] = np.mean(mi, axis = 1)
+        print("Gamma = " + str(gamma_vals[i]))
+        for j in range(len(h_anchors) + 1):
+            tmp_h_anchors = h_anchors[:j]
+            print(" ---- " + str(tmp_h_anchors))
+            lambdaSelAll, mse_df, sem_CV, corr_pearson, mi = cross_validation_anchor_regression(
+                modelsDataList,
+                modelsInfoFrame,
+                deepcopy(dict_models),
+                params_climate,
+                gamma_vals[i],
+                tmp_h_anchors,
+                cv_vals,
+                display_CV_plot = False,
+            )
+
+            mse_gamma[i,j,:] = mse_df.iloc[:,-1].values
+            corr_gamma[i,j,:] = np.nanmean(corr_pearson, axis = 1)
+            mi_gamma[i,j,:] = np.mean(mi, axis = 1)
     
     if not os.path.isdir("./../output/data/"):
         os.makedirs("./../output/data/")
     filename = "./../output/data/params_optimization_" \
         + params_climate["target"] + "_" + params_climate["anchor"] + ".pkl"
     with open(filename, "wb") as f:
-        pickle.dump([mse_gamma, corr_gamma, mi_gamma], f)
+        pickle.dump([mse_gamma, corr_gamma, mi_gamma, gamma_vals, h_anchors, cv_vals], f)
+        
+        
+def param_optimization_gamma(params_climate, params_anchor):
     
-    return mse_gamma, corr_gamma, mi_gamma  
+    target = params_climate["target"]
+    anchor = params_climate["anchor"]
+    gamma = params_anchor["gamma"][0]
+    h_anchors = params_anchor["h_anchors"]
+
+    modelsDataList, modelsInfoFrame = read_files_cmip6(
+        params_climate, norm=True
+    )
+
+    dict_models = split_train_test(
+        modelsDataList, modelsInfoFrame, target, anchor
+    )
+    
+    cv_vals = 50
+    
+    lambdaSelAll, mse_df, sem_CV, corr_pearson, mi = cross_validation_anchor_regression(
+        modelsDataList,
+        modelsInfoFrame,
+        deepcopy(dict_models),
+        params_climate,
+        gamma,
+        h_anchors,
+        cv_vals,
+        display_CV_plot = False,
+    )
+
+    dirname = "./../output/data/"
+    if not os.path.isdir(dirname):
+        os.makedirs(dirname)
+    filename = (
+            dirname
+            + "param_optimization_gamma_target_"
+            + params_climate["target"]
+            + "_"
+            + "anchor_"
+            + params_climate["anchor"]
+            + "_"
+            + "-".join(params_climate["variables"])
+            + "_"
+            + "-".join(params_climate["scenarios"])
+            + "_"
+            + str(params_climate["startDate"])
+            + "_"
+            + str(params_climate["endDate"])
+            + "_"
+            + "gamma_"
+            + str(gamma)
+            + "_"
+            + "nonlinear-h_"
+            + str(len(h_anchors))
+            + "-".join(h_anchors)
+            + ".pkl"
+    )
+    with open(filename, "wb") as f:
+        pickle.dump([mse_df, corr_pearson, mi, gamma, h_anchors], f)
+

@@ -21,7 +21,7 @@ Target: 1) forcing (from ERF files): total, total_anthropogenic, GHG, CO2,
 
 import argparse
 
-from anchor_regression import run_anchor_regression_all
+from anchor_regression import run_anchor_regression_all, param_optimization, param_optimization_gamma
 from parse_args import args_climate, args_anchor
 
 
@@ -42,8 +42,8 @@ def parser_args():
 
 def main(params_climate, params_anchor):
 
-    run_anchor_regression_all(params_climate, params_anchor, display_CV_plot = True)
-
+#     run_anchor_regression_all(params_climate, params_anchor, display_CV_plot = True)
+    param_optimization_gamma(params_climate, params_anchor)
 
 if __name__ == "__main__":
     params_climate, params_anchor = parser_args()
