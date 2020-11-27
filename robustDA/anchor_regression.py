@@ -421,7 +421,7 @@ def cross_validation_anchor_regression(
     if sel_method == "pareto":
         lambdaSel, _, _ = choose_lambda_pareto(
             mse_df.iloc[:, -1].values,
-            np.abs(np.mean(corr_pearson, axis=1)),
+            np.mean(corr_pearson, axis=1),
             mse_df.index,
             maxX=False,
             maxY=False,
@@ -467,6 +467,9 @@ def cross_validation_anchor_regression(
 
 def choose_lambda_pareto(Xs, Ys, lambdavals, maxX=True, maxY=True):
     """Pareto frontier selection process"""
+    Xs = np.abs(Xs)
+    Ys = np.abs(Ys)
+
     sorted_list = sorted(
         [[Xs[i], Ys[i]] for i in range(len(Xs))], reverse=maxY
     )
@@ -659,7 +662,7 @@ def param_optimization(params_climate, params_anchor):
             mse_gamma[i, j, :] = mse_df.iloc[:, -1].values
             corr_gamma[i, j, :] = np.mean(corr_pearson, axis=1)
             mi_gamma[i, j, :] = np.mean(mi, axis=1)
-
+            
     dirname = "./../output/data/"
     if not os.path.isdir(dirname):
         os.makedirs(dirname)
@@ -697,6 +700,49 @@ def param_optimization(params_climate, params_anchor):
             ],
             f,
         )
+
+
+def choose_gamma_h_lambda_pareto(Xs, Ys, gamma_vals, h_anchors, lambdavals, maxX=True, maxY=True):
+    '''Pareto frontier selection process'''
+    Xs = np.abs(Xs)
+    Xsv = Xs.reshape(-1,1)
+    Ys = np.abs(Ys)
+    Ysv = Ys.reshape(-1,1)
+    sorted_list = sorted([[Xsv[i], Ysv[i]] for i in range(len(Xsv))], reverse=maxY)
+    pareto_front = [sorted_list[0]]
+    for pair in sorted_list[1:]:
+        if maxY:
+            if pair[1] >= pareto_front[-1][1]:
+                pareto_front.append(pair)
+        else:
+            if pair[1] <= pareto_front[-1][1]:
+                pareto_front.append(pair)
+    
+    '''Plotting process'''
+    plt.scatter(Xsv, Ysv)
+    pf_X = [pair[0] for pair in pareto_front]
+    pf_Y = [pair[1] for pair in pareto_front]
+    plt.plot(pf_X, pf_Y)
+    plt.xlabel("Objective 1")
+    plt.ylabel("Objective 2")
+    
+    ideal = [min(Xsv), min(Ysv)]
+    dst = helpers.compute_distance(ideal, pf_X, pf_Y)
+    ind = np.argmin(dst)
+
+    for i in range(Xs.shape[0]):
+        for j in range(Xs.shape[1]):
+            for k in range(lambdavals.shape[0]):
+                if (Xs[i,j,k] == pf_X[ind]) and (Ys[i,j,k] == pf_Y[ind]):
+                    gammaSel = gamma_vals[i]
+                    hSel = h_anchors[:j]
+                    lambdaSel = lambdavals[k]
+    
+    plt.plot(ideal[0], ideal[1], "k*")
+    plt.plot(pf_X[ind], pf_Y[ind], "ro")
+    plt.show()
+    
+    return gammaSel, hSel, lambdaSel, pf_X, pf_Y
 
 
 def param_optimization_gamma(params_climate, params_anchor):
