@@ -241,7 +241,7 @@ def make_plots(
             bbox_inches="tight",
         )
         
-#     plt.close()
+    plt.close()
 
 
 def plot_CV(mse_df, lambdasSelAll, sem_CV, filename, folds):
@@ -302,4 +302,4 @@ def plot_CV(mse_df, lambdasSelAll, sem_CV, filename, folds):
         os.makedirs("./../output/figures/")
     fig.savefig("./../output/figures/" + filename, bbox_inches="tight")
     
-#     plt.close()
+    plt.close()
