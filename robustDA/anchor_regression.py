@@ -567,8 +567,7 @@ def param_optimization(params_climate, params_anchor):
     gamma_vals = params_anchor["gamma"]
     h_anchors = params_anchor["h_anchors"]
 
-    cv_vals = 50
-    lambdaCV = np.logspace(-2, 6, cv_vals)
+    cv_vals = 5
     mse_gamma = np.zeros([len(gamma_vals), len(h_anchors) + 1, cv_vals])
     corr_gamma = np.zeros([len(gamma_vals), len(h_anchors) + 1, cv_vals])
     mi_gamma = np.zeros([len(gamma_vals), len(h_anchors) + 1, cv_vals])
@@ -586,7 +585,18 @@ def param_optimization(params_climate, params_anchor):
         for j in range(len(h_anchors) + 1):
             tmp_h_anchors = h_anchors[:j]
             print(" ---- " + str(tmp_h_anchors))
-            lambdaSelAll, mse_df, sem_CV, corr_pearson, mi = cross_validation_anchor_regression(
+#             lambdaSelAll, mse_df, sem_CV, corr_pearson, mi = cross_validation_anchor_regression(
+#                 modelsDataList,
+#                 modelsInfoFrame,
+#                 deepcopy(dict_models),
+#                 params_climate,
+#                 gamma_vals[i],
+#                 tmp_h_anchors,
+#                 cv_vals,
+#                 display_CV_plot = False,
+#             )
+
+            _, mse_df, corr_pearson, mi = cross_validation_anchor_regression(
                 modelsDataList,
                 modelsInfoFrame,
                 deepcopy(dict_models),
@@ -594,6 +604,7 @@ def param_optimization(params_climate, params_anchor):
                 gamma_vals[i],
                 tmp_h_anchors,
                 cv_vals,
+                sel_method = "pareto",
                 display_CV_plot = False,
             )
 
