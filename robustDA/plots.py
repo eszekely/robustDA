@@ -128,7 +128,7 @@ def make_plots(
     )
     title = "Raw coefficients ($\\gamma$ = " + str(gamma) + ")"
     plotMapCartopy_subplots(
-        fig, ax, coefRaw.reshape(grid), cLim=None, title_subplot=title
+        fig, ax, coefRaw.reshape(grid), cLim=0.005, title_subplot=title
     )
 
     ax = fig.add_subplot(spec[1])

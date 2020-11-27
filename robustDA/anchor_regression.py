@@ -70,7 +70,9 @@ def build_column_space(y_anchor, h_anchors):
             ).reshape(-1)
 
     A_h = np.mat(A_h)  # needed for matrix multiplication
-    PA = A_h * np.linalg.inv(np.transpose(A_h) * A_h) * np.transpose(A_h)
+#     PA = A_h * np.linalg.inv(np.transpose(A_h) * A_h) * np.transpose(A_h)
+    A_h_std = np.mat(StandardScaler().fit_transform(A_h))
+    PA = A_h_std * np.linalg.inv(np.transpose(A_h_std) * A_h_std) * np.transpose(A_h_std)
 
     return PA
 
@@ -270,8 +272,8 @@ def anchor_regression(
         + "-".join(h_anchors)
         + "_"
         + "lambda_"
-        + str(nbSem)
-        + "SEM-"
+#         + str(nbSem)
+#         + "SEM-"
         + str(np.round(lambdaSel, 2))
         + ".pdf"
     )
@@ -456,7 +458,7 @@ def choose_lambda_pareto(Xs, Ys, lambdavals, maxX=True, maxY=True):
     ideal = [min(Xs), min(Ys)]
     dst = helpers.compute_distance(ideal, pf_X, pf_Y)
     ind = np.argmin(dst)
-    lambdaSel = [lambdavals[i] for i in range(len(lambdavals)) if (Xs[i] == pf_X[ind]) and (Ys[i] == pf_Y[ind])]
+    lambdaSel = [lambdavals[i] for i in range(len(lambdavals)) if (Xs[i] == pf_X[ind]) and (Ys[i] == pf_Y[ind])][0]
     plt.plot(ideal[0], ideal[1], "k*")
     plt.plot(pf_X[ind], pf_Y[ind], "ro")
     plt.show()
