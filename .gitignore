@@ -1,7 +1,6 @@
 # exclude mounted files and output files
 /data/mount
 /output
-
 */__pycache__/*.pyc
 *.pyc
 *.egg-info/
