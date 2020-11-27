@@ -262,7 +262,7 @@ def anchor_regression(
     h_anchors,
     lambdaSel,
     params_climate,
-    nbSem,
+    nbSem = 2,
 ):
 
     coefRaw, y_test_pred, mse = anchor_regression_estimator(
@@ -340,7 +340,7 @@ def cross_validation_anchor_regression(
         displayModels=False,
     )
 
-    lambdasCV = np.logspace(-2, 6, cv_lambda_vals)
+    lambdasCV = np.logspace(-2, 5, cv_lambda_vals)
 
     nbFoldsCV = len(dict_folds["foldsData"])
     mse = np.zeros([len(lambdasCV), nbFoldsCV])
@@ -612,7 +612,7 @@ def param_optimization(params_climate, params_anchor):
     gamma_vals = params_anchor["gamma"]
     h_anchors = params_anchor["h_anchors"]
 
-    cv_vals = 5
+    cv_vals = 50
     mse_gamma = np.zeros([len(gamma_vals), len(h_anchors) + 1, cv_vals])
     corr_gamma = np.zeros([len(gamma_vals), len(h_anchors) + 1, cv_vals])
     mi_gamma = np.zeros([len(gamma_vals), len(h_anchors) + 1, cv_vals])
@@ -627,9 +627,12 @@ def param_optimization(params_climate, params_anchor):
 
     for i in range(len(gamma_vals)):
         print("Gamma = " + str(gamma_vals[i]))
-        for j in range(len(h_anchors) + 1):
-            tmp_h_anchors = h_anchors[:j]
+        for j in range(len(h_anchors)):
+            tmp_h_anchors = h_anchors
             print(" ---- " + str(tmp_h_anchors))
+#         for j in range(len(h_anchors) + 1):
+#             tmp_h_anchors = h_anchors[:j]
+#             print(" ---- " + str(tmp_h_anchors))
 #             (
 #                 lambdaSelAll,
 #                 mse_df,
