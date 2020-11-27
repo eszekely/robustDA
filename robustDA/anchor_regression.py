@@ -426,10 +426,9 @@ def cross_validation_anchor_regression(
             maxX=False,
             maxY=False,
         )
-        return lambdaSel, mse_df, corr_pearson, mi
 
     elif sel_method == "MSE":
-        lambdasSelAll, sem_CV = choose_lambda(mse_df, lambdasCV)
+        lambdaSel, sem_CV = choose_lambda(mse_df, lambdasCV)
 
         if display_CV_plot:
             filename = (
@@ -457,13 +456,13 @@ def cross_validation_anchor_regression(
             )
             plot_CV(
                 mse_df,
-                lambdasSelAll,
+                lambdaSel,
                 sem_CV,
                 filename,
                 dict_folds["trainFolds"],
             )
 
-        return lambdasSelAll, mse_df, sem_CV, corr_pearson, mi
+    return lambdaSel, mse_df, corr_pearson, mi
 
 
 def choose_lambda_pareto(Xs, Ys, lambdavals, maxX=True, maxY=True):
@@ -628,7 +627,7 @@ def param_optimization(params_climate, params_anchor):
         for j in range(len(h_anchors) + 1):
             tmp_h_anchors = h_anchors[:j]
             print(" ---- " + str(tmp_h_anchors))
-            (
+#             (
 #                 lambdaSelAll,
 #                 mse_df,
 #                 sem_CV,
@@ -645,7 +644,7 @@ def param_optimization(params_climate, params_anchor):
 #                 display_CV_plot=False,
 #             )
 
-            _, mse_df, corr_pearson, mi = cross_validation_anchor_regression(
+            lambdaSel, mse_df, corr_pearson, mi = cross_validation_anchor_regression(
                 modelsDataList,
                 modelsInfoFrame,
                 deepcopy(dict_models),
