@@ -43,7 +43,7 @@ def parser_args():
 def main(params_climate, params_anchor):
 
 #     run_anchor_regression_all(params_climate, params_anchor, display_CV_plot = True)
-    param_optimization_gamma(params_climate, params_anchor)
+    param_optimization(params_climate, params_anchor)
 
 if __name__ == "__main__":
     params_climate, params_anchor = parser_args()
