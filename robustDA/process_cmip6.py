@@ -28,14 +28,14 @@ def print_info_netcdf(netcdf_dataset):
     print(list(netcdf_dataset.variables.keys()))
 
 
-def read_files_cmip6(params_climate, norm = True):
+def read_files_cmip6(params_climate, norm=True):
 
     temporalRes = params_climate["temporalRes"]
     variables = params_climate["variables"]
     scenarios = params_climate["scenarios"]
     startDate = params_climate["startDate"]
     endDate = params_climate["endDate"]
-    
+
     modelsDataList = []
 
     for var in variables:
@@ -67,7 +67,7 @@ def read_files_cmip6(params_climate, norm = True):
                                 netCDF4.num2date(
                                     temp_nc.variables["time"][:],
                                     temp_nc.variables["time"].units,
-                                    only_use_cftime_datetimes=False
+                                    only_use_cftime_datetimes=False,
                                 )
                             ).year
                             """ Keep files only if dates are unique
@@ -153,7 +153,7 @@ def read_files_cmip6(params_climate, norm = True):
         modelsInfoFrame.iloc[i, 4] = modelsDataList[i].model
         modelsInfoFrame.iloc[i, 5] = modelsDataList[i].scenario
         modelsInfoFrame.iloc[i, 6] = modelsDataList[i].spatialRes
-        
+
     """ Remove models that only have piControl runs """
     nbFiles = len(modelsDataList)
     models = sorted(set([modelsDataList[i].model for i in range(nbFiles)]))
@@ -161,18 +161,25 @@ def read_files_cmip6(params_climate, norm = True):
 
     for i in range(len(models)):
         scenarios = [
-                modelsDataList[j].scenario
-                for j in range(nbFiles)
-                    if modelsDataList[j].model == models[i]
-            ]
-        if set(scenarios) == set(['piControl']):
+            modelsDataList[j].scenario
+            for j in range(nbFiles)
+            if modelsDataList[j].model == models[i]
+        ]
+        if set(scenarios) == set(["piControl"]):
             modelsRemove.add(models[i])
 
-    modelsDataList_final = [modelsDataList[i] for i in range(len(modelsDataList)) 
-                            if modelsDataList[i].model not in modelsRemove]
-    ind = [i for i in range(modelsInfoFrame.shape[0]) if modelsInfoFrame.loc[i]["model"] in modelsRemove]
+    modelsDataList_final = [
+        modelsDataList[i]
+        for i in range(len(modelsDataList))
+        if modelsDataList[i].model not in modelsRemove
+    ]
+    ind = [
+        i
+        for i in range(modelsInfoFrame.shape[0])
+        if modelsInfoFrame.loc[i]["model"] in modelsRemove
+    ]
     modelsInfoFrame = modelsInfoFrame.drop(ind)
-    modelsInfoFrame = modelsInfoFrame.reset_index(drop = True)
+    modelsInfoFrame = modelsInfoFrame.reset_index(drop=True)
 
     return modelsDataList_final, modelsInfoFrame
 

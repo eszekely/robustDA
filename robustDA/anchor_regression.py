@@ -70,9 +70,13 @@ def build_column_space(y_anchor, h_anchors):
             ).reshape(-1)
 
     A_h = np.mat(A_h)  # needed for matrix multiplication
-#     PA = A_h * np.linalg.inv(np.transpose(A_h) * A_h) * np.transpose(A_h)
+    #     PA = A_h * np.linalg.inv(np.transpose(A_h) * A_h) * np.transpose(A_h)
     A_h_std = np.mat(StandardScaler().fit_transform(A_h))
-    PA = A_h_std * np.linalg.inv(np.transpose(A_h_std) * A_h_std) * np.transpose(A_h_std)
+    PA = (
+        A_h_std
+        * np.linalg.inv(np.transpose(A_h_std) * A_h_std)
+        * np.transpose(A_h_std)
+    )
 
     return PA
 
@@ -143,7 +147,7 @@ def anchor_regression_estimator(
         coefRaw = coefStd.T / np.array(std_X_train).reshape(p, 1)
 
         y_test_pred = np.array(np.matmul(Xt, coefStd.T))
-        
+
     mse = np.mean((yt - y_test_pred) ** 2)
 
     return coefRaw, y_test_pred, mse
@@ -213,8 +217,14 @@ def run_anchor_regression(
 ):
 
     cv_vals = 50
-    
-    lambdaSelAll, mse_df, sem_CV, corr_pearson, mi = cross_validation_anchor_regression(
+
+    (
+        lambdaSelAll,
+        mse_df,
+        sem_CV,
+        corr_pearson,
+        mi,
+    ) = cross_validation_anchor_regression(
         modelsDataList,
         modelsInfoFrame,
         deepcopy(dict_models),
@@ -227,12 +237,22 @@ def run_anchor_regression(
 
     nbSem = 1
     anchor_regression(
-        dict_models, gamma, h_anchors, lambdaSelAll[nbSem], params_climate, nbSem
+        dict_models,
+        gamma,
+        h_anchors,
+        lambdaSelAll[nbSem],
+        params_climate,
+        nbSem,
     )
 
     nbSem = 2
     anchor_regression(
-        dict_models, gamma, h_anchors, lambdaSelAll[nbSem], params_climate, nbSem
+        dict_models,
+        gamma,
+        h_anchors,
+        lambdaSelAll[nbSem],
+        params_climate,
+        nbSem,
     )
 
 
@@ -272,8 +292,8 @@ def anchor_regression(
         + "-".join(h_anchors)
         + "_"
         + "lambda_"
-#         + str(nbSem)
-#         + "SEM-"
+        #         + str(nbSem)
+        #         + "SEM-"
         + str(np.round(lambdaSel, 2))
         + ".pdf"
     )
@@ -299,7 +319,7 @@ def cross_validation_anchor_regression(
     gamma,
     h_anchors,
     cv_lambda_vals,
-    sel_method = "pareto",
+    sel_method="pareto",
     display_CV_plot=False,
 ):
 
@@ -381,15 +401,17 @@ def cross_validation_anchor_regression(
             regr.fit(X_PA, y_PA)
             y_val_pred = regr.predict(X_val)
             residuals = (y_val_true - y_val_pred).reshape(-1)
-            
+
             mse[j][i] = np.mean((y_val_true - y_val_pred) ** 2)
             corr_pearson[j][i] = np.round(
-                np.corrcoef(np.transpose(y_anchor_val), np.transpose(residuals))[
-                    0, 1
-                ],
+                np.corrcoef(
+                    np.transpose(y_anchor_val), np.transpose(residuals)
+                )[0, 1],
                 2,
             )
-            mi[j][i] = np.round(mutual_info_regression(y_anchor_val, residuals)[0], 2)
+            mi[j][i] = np.round(
+                mutual_info_regression(y_anchor_val, residuals)[0], 2
+            )
 
     columnNames = ["MSE - Fold " + str(i) for i in range(nbFoldsCV)]
     mse_df = pd.DataFrame(mse, index=lambdasCV, columns=columnNames)
@@ -397,10 +419,13 @@ def cross_validation_anchor_regression(
     mse_df.index.name = "Lambda"
 
     if sel_method == "pareto":
-        lambdaSel, _, _ = choose_lambda_pareto(mse_df.iloc[:,-1].values, 
-                                          np.abs(np.mean(corr_pearson, axis = 1)),
-                                          mse_df.index,
-                                          maxX = False, maxY = False)
+        lambdaSel, _, _ = choose_lambda_pareto(
+            mse_df.iloc[:, -1].values,
+            np.abs(np.mean(corr_pearson, axis=1)),
+            mse_df.index,
+            maxX=False,
+            maxY=False,
+        )
         return lambdaSel, mse_df, corr_pearson, mi
 
     elif sel_method == "MSE":
@@ -430,14 +455,22 @@ def cross_validation_anchor_regression(
                 + "-".join(h_anchors)
                 + "_CV.pdf"
             )
-            plot_CV(mse_df, lambdasSelAll, sem_CV, filename, dict_folds["trainFolds"])
+            plot_CV(
+                mse_df,
+                lambdasSelAll,
+                sem_CV,
+                filename,
+                dict_folds["trainFolds"],
+            )
 
         return lambdasSelAll, mse_df, sem_CV, corr_pearson, mi
 
-    
+
 def choose_lambda_pareto(Xs, Ys, lambdavals, maxX=True, maxY=True):
-    '''Pareto frontier selection process'''
-    sorted_list = sorted([[Xs[i], Ys[i]] for i in range(len(Xs))], reverse=maxY)
+    """Pareto frontier selection process"""
+    sorted_list = sorted(
+        [[Xs[i], Ys[i]] for i in range(len(Xs))], reverse=maxY
+    )
     pareto_front = [sorted_list[0]]
     for pair in sorted_list[1:]:
         if maxY:
@@ -446,23 +479,27 @@ def choose_lambda_pareto(Xs, Ys, lambdavals, maxX=True, maxY=True):
         else:
             if pair[1] <= pareto_front[-1][1]:
                 pareto_front.append(pair)
-    
-    '''Plotting process'''
-    plt.scatter(Xs,Ys)
+
+    """Plotting process"""
+    plt.scatter(Xs, Ys)
     pf_X = [pair[0] for pair in pareto_front]
     pf_Y = [pair[1] for pair in pareto_front]
     plt.plot(pf_X, pf_Y)
     plt.xlabel("Objective 1")
     plt.ylabel("Objective 2")
-    
+
     ideal = [min(Xs), min(Ys)]
     dst = helpers.compute_distance(ideal, pf_X, pf_Y)
     ind = np.argmin(dst)
-    lambdaSel = [lambdavals[i] for i in range(len(lambdavals)) if (Xs[i] == pf_X[ind]) and (Ys[i] == pf_Y[ind])][0]
+    lambdaSel = [
+        lambdavals[i]
+        for i in range(len(lambdavals))
+        if (Xs[i] == pf_X[ind]) and (Ys[i] == pf_Y[ind])
+    ][0]
     plt.plot(ideal[0], ideal[1], "k*")
     plt.plot(pf_X[ind], pf_Y[ind], "ro")
     plt.show()
-    
+
     return lambdaSel, pf_X, pf_Y
 
 
@@ -499,10 +536,12 @@ def choose_lambda(mse_df, lambdasCV):
     return lambdasSelAll, sem_CV
 
 
-def subagging(modelsDataList, modelsInfoFrame, params_climate, params_anchor, nbRuns):
+def subagging(
+    modelsDataList, modelsInfoFrame, params_climate, params_anchor, nbRuns
+):
     grid = (72, 144)
     mse_runs = np.zeros([nbRuns, 1])
-    coefRaw_runs = np.zeros([nbRuns, grid[0]*grid[1]])
+    coefRaw_runs = np.zeros([nbRuns, grid[0] * grid[1]])
     lambdaSel_runs = np.zeros([nbRuns, 1])
     trainFiles = []
     testFiles = []
@@ -510,18 +549,22 @@ def subagging(modelsDataList, modelsInfoFrame, params_climate, params_anchor, nb
     for r in range(nbRuns):
         print("---- Run = " + str(r) + " ----")
 
-        dict_models = split_train_test(modelsDataList, modelsInfoFrame, 
-                                              params_climate["target"], params_climate["anchor"])
+        dict_models = split_train_test(
+            modelsDataList,
+            modelsInfoFrame,
+            params_climate["target"],
+            params_climate["anchor"],
+        )
 
-        print(dict_models['trainModels'])
-        print(dict_models['testModels'])
+        print(dict_models["trainModels"])
+        print(dict_models["testModels"])
 
         trainFiles.append(dict_models["trainFiles"])
         testFiles.append(dict_models["testFiles"])
 
         gamma = params_anchor["gamma"]
         h_anchors = params_anchor["h_anchors"]
-        
+
         cv_vals = 30
         display_CV_plot = False
         lambdaSelAll, mse_df, sem_CV = cross_validation_anchor_regression(
@@ -535,7 +578,7 @@ def subagging(modelsDataList, modelsInfoFrame, params_climate, params_anchor, nb
             display_CV_plot,
         )
 
-        """ Train with the chosen lambda to learn the coefficients beta, 
+        """ Train with the chosen lambda to learn the coefficients beta,
         and get the error of each run by testing with the test set
         """
 
@@ -548,19 +591,19 @@ def subagging(modelsDataList, modelsInfoFrame, params_climate, params_anchor, nb
         mse_runs[r] = mse
         coefRaw_runs[r, :] = coefRaw
 
-    mse_runs_df = pd.DataFrame(mse_runs, columns = ['MSE'])
-    mse_runs_df['Lambda selected'] = pd.DataFrame(lambdaSel_runs)
-    mse_runs_df.index.name = 'Run'
+    mse_runs_df = pd.DataFrame(mse_runs, columns=["MSE"])
+    mse_runs_df["Lambda selected"] = pd.DataFrame(lambdaSel_runs)
+    mse_runs_df.index.name = "Run"
 
-    coefRaw_final = np.sum(coefRaw_runs, axis = 0).reshape(-1,1)
+    coefRaw_final = np.sum(coefRaw_runs, axis=0).reshape(-1, 1)
 
-    #mse_df.to_csv("./../output/data/MSE_rcp85_norm_train30_cv5_lambda0_5_100.csv")
+    # mse_df.to_csv("./../output/data/MSE_rcp85_norm_train30_cv5_lambda0_5_100.csv")
 
     return coefRaw_final, coefRaw_runs, mse_runs_df, trainFiles, testFiles
 
 
 def param_optimization(params_climate, params_anchor):
-    
+
     print("Param optimization")
     target = params_climate["target"]
     anchor = params_climate["anchor"]
@@ -571,7 +614,7 @@ def param_optimization(params_climate, params_anchor):
     mse_gamma = np.zeros([len(gamma_vals), len(h_anchors) + 1, cv_vals])
     corr_gamma = np.zeros([len(gamma_vals), len(h_anchors) + 1, cv_vals])
     mi_gamma = np.zeros([len(gamma_vals), len(h_anchors) + 1, cv_vals])
-    
+
     modelsDataList, modelsInfoFrame = read_files_cmip6(
         params_climate, norm=True
     )
@@ -579,13 +622,19 @@ def param_optimization(params_climate, params_anchor):
     dict_models = split_train_test(
         modelsDataList, modelsInfoFrame, target, anchor
     )
-    
+
     for i in range(len(gamma_vals)):
         print("Gamma = " + str(gamma_vals[i]))
         for j in range(len(h_anchors) + 1):
             tmp_h_anchors = h_anchors[:j]
             print(" ---- " + str(tmp_h_anchors))
-#             lambdaSelAll, mse_df, sem_CV, corr_pearson, mi = cross_validation_anchor_regression(
+            (
+#                 lambdaSelAll,
+#                 mse_df,
+#                 sem_CV,
+#                 corr_pearson,
+#                 mi,
+#             ) = cross_validation_anchor_regression(
 #                 modelsDataList,
 #                 modelsInfoFrame,
 #                 deepcopy(dict_models),
@@ -593,7 +642,7 @@ def param_optimization(params_climate, params_anchor):
 #                 gamma_vals[i],
 #                 tmp_h_anchors,
 #                 cv_vals,
-#                 display_CV_plot = False,
+#                 display_CV_plot=False,
 #             )
 
             _, mse_df, corr_pearson, mi = cross_validation_anchor_regression(
@@ -604,44 +653,55 @@ def param_optimization(params_climate, params_anchor):
                 gamma_vals[i],
                 tmp_h_anchors,
                 cv_vals,
-                sel_method = "pareto",
-                display_CV_plot = False,
+                sel_method="pareto",
+                display_CV_plot=False,
             )
 
-            mse_gamma[i,j,:] = mse_df.iloc[:,-1].values
-            corr_gamma[i,j,:] = np.mean(corr_pearson, axis = 1)
-            mi_gamma[i,j,:] = np.mean(mi, axis = 1)
-    
+            mse_gamma[i, j, :] = mse_df.iloc[:, -1].values
+            corr_gamma[i, j, :] = np.mean(corr_pearson, axis=1)
+            mi_gamma[i, j, :] = np.mean(mi, axis=1)
+
     dirname = "./../output/data/"
     if not os.path.isdir(dirname):
         os.makedirs(dirname)
     filename = (
-            dirname
-            + "param_optimization_target_"
-            + params_climate["target"]
-            + "_"
-            + "anchor_"
-            + params_climate["anchor"]
-            + "_"
-            + "-".join(params_climate["variables"])
-            + "_"
-            + "-".join(params_climate["scenarios"])
-            + "_"
-            + str(params_climate["startDate"])
-            + "_"
-            + str(params_climate["endDate"])
-            + "_"
-            + "nonlinear-h_"
-            + str(len(h_anchors))
-            + "-".join(h_anchors)
-            + ".pkl"
+        dirname
+        + "param_optimization_target_"
+        + params_climate["target"]
+        + "_"
+        + "anchor_"
+        + params_climate["anchor"]
+        + "_"
+        + "-".join(params_climate["variables"])
+        + "_"
+        + "-".join(params_climate["scenarios"])
+        + "_"
+        + str(params_climate["startDate"])
+        + "_"
+        + str(params_climate["endDate"])
+        + "_"
+        + "nonlinear-h_"
+        + str(len(h_anchors))
+        + "-".join(h_anchors)
+        + ".pkl"
     )
     with open(filename, "wb") as f:
-        pickle.dump([mse_gamma, corr_gamma, mi_gamma, gamma_vals, h_anchors, cv_vals, dict_models], f)
-        
-        
+        pickle.dump(
+            [
+                mse_gamma,
+                corr_gamma,
+                mi_gamma,
+                gamma_vals,
+                h_anchors,
+                cv_vals,
+                dict_models,
+            ],
+            f,
+        )
+
+
 def param_optimization_gamma(params_climate, params_anchor):
-    
+
     target = params_climate["target"]
     anchor = params_climate["anchor"]
     gamma = params_anchor["gamma"][0]
@@ -654,10 +714,16 @@ def param_optimization_gamma(params_climate, params_anchor):
     dict_models = split_train_test(
         modelsDataList, modelsInfoFrame, target, anchor
     )
-    
+
     cv_vals = 5
-    
-    lambdaSelAll, mse_df, sem_CV, corr_pearson, mi = cross_validation_anchor_regression(
+
+    (
+        lambdaSelAll,
+        mse_df,
+        sem_CV,
+        corr_pearson,
+        mi,
+    ) = cross_validation_anchor_regression(
         modelsDataList,
         modelsInfoFrame,
         deepcopy(dict_models),
@@ -665,36 +731,35 @@ def param_optimization_gamma(params_climate, params_anchor):
         gamma,
         h_anchors,
         cv_vals,
-        display_CV_plot = False,
+        display_CV_plot=False,
     )
 
     dirname = "./../output/data/"
     if not os.path.isdir(dirname):
         os.makedirs(dirname)
     filename = (
-            dirname
-            + "param_optimization_gamma_target_"
-            + params_climate["target"]
-            + "_"
-            + "anchor_"
-            + params_climate["anchor"]
-            + "_"
-            + "-".join(params_climate["variables"])
-            + "_"
-            + "-".join(params_climate["scenarios"])
-            + "_"
-            + str(params_climate["startDate"])
-            + "_"
-            + str(params_climate["endDate"])
-            + "_"
-            + "gamma_"
-            + str(gamma)
-            + "_"
-            + "nonlinear-h_"
-            + str(len(h_anchors))
-            + "-".join(h_anchors)
-            + ".pkl"
+        dirname
+        + "param_optimization_gamma_target_"
+        + params_climate["target"]
+        + "_"
+        + "anchor_"
+        + params_climate["anchor"]
+        + "_"
+        + "-".join(params_climate["variables"])
+        + "_"
+        + "-".join(params_climate["scenarios"])
+        + "_"
+        + str(params_climate["startDate"])
+        + "_"
+        + str(params_climate["endDate"])
+        + "_"
+        + "gamma_"
+        + str(gamma)
+        + "_"
+        + "nonlinear-h_"
+        + str(len(h_anchors))
+        + "-".join(h_anchors)
+        + ".pkl"
     )
     with open(filename, "wb") as f:
         pickle.dump([mse_df, corr_pearson, mi, gamma, h_anchors], f)
-

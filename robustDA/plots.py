@@ -114,7 +114,7 @@ def make_plots(
     sc_y_test = StandardScaler(with_mean=True, with_std=True)
     y_test_std = sc_y_test.fit_transform(y_test.values)
     y_test_true = y_test_std
-    
+
     # Standardize ?
     y_anchor_test = dict_models["y_anchor_test"]
 
@@ -240,7 +240,7 @@ def make_plots(
             "./../output/figures/" + filename,
             bbox_inches="tight",
         )
-        
+
     plt.close()
 
 
@@ -257,7 +257,7 @@ def plot_CV(mse_df, lambdasSelAll, sem_CV, filename, folds):
 
     for i in range(mse_df.shape[1] - 1):
         ax1.plot(mse_df.index, mse_df.iloc[:, i], label="_nolegend_")
-#         ax1.plot(mse_df.index, mse_df.iloc[:, i], label=folds[i])
+    #         ax1.plot(mse_df.index, mse_df.iloc[:, i], label=folds[i])
 
     ax1.plot(mse_df.index, mse_df.iloc[:, i + 1], "k.-")
 
@@ -297,9 +297,9 @@ def plot_CV(mse_df, lambdasSelAll, sem_CV, filename, folds):
     ax2.set_xscale("log")
     ax2.set_yscale("log")
     ax2.set_xlabel("$\\lambda$", fontsize=14)
-    
+
     if not os.path.isdir("./../output/figures/"):
         os.makedirs("./../output/figures/")
     fig.savefig("./../output/figures/" + filename, bbox_inches="tight")
-    
+
     plt.close()

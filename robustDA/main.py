@@ -21,30 +21,56 @@ Target: 1) forcing (from ERF files): total, total_anthropogenic, GHG, CO2,
 
 import argparse
 
-from anchor_regression import run_anchor_regression_all, param_optimization, param_optimization_gamma
+from anchor_regression import (
+    run_anchor_regression_all,
+    param_optimization,
+    param_optimization_gamma,
+)
 from parse_args import args_climate, args_anchor
 
 
 def parser_args():
     parser = argparse.ArgumentParser()
-    
-    parser.add_argument("--target", help="The target forcing you want to predict")
-    parser.add_argument("--anchor", help="The anchor forcing we want to protect against")
-    parser.add_argument("--gamma", nargs = "*", type = int, help="The anchor causal regularization parameter")
-    parser.add_argument("--nonlinear_anchors", nargs = "*", help="The nonlinear functions used in anchor")
+
+    parser.add_argument("--exp", help="The experiment to run")
+    parser.add_argument(
+        "--target", help="The target forcing you want to predict"
+    )
+    parser.add_argument(
+        "--anchor", help="The anchor forcing we want to protect against"
+    )
+    parser.add_argument(
+        "--gamma",
+        nargs="*",
+        type=int,
+        help="The anchor causal regularization parameter",
+    )
+    parser.add_argument(
+        "--nonlinear_anchors",
+        nargs="*",
+        help="The nonlinear functions used in anchor",
+    )
 
     args = parser.parse_args()
+    exp = args.exp
     params_climate = args_climate(args)
     params_anchor = args_anchor(args)
-    
-    return params_climate, params_anchor
+
+    return exp, params_climate, params_anchor
 
 
-def main(params_climate, params_anchor):
+def main(exp, params_climate, params_anchor):
 
-#     run_anchor_regression_all(params_climate, params_anchor, display_CV_plot = True)
-    param_optimization(params_climate, params_anchor)
+    if exp == "run_anchor_regression_all":
+        run_anchor_regression_all(
+            params_climate, params_anchor, display_CV_plot=True
+        )
+    elif exp == "param_opt":
+        param_optimization(params_climate, params_anchor)
+    elif exp == "param_opt_gamma":
+        param_optimization_gamma(params_climate, params_anchor)
+
 
 if __name__ == "__main__":
-    params_climate, params_anchor = parser_args()
-    main(params_climate, params_anchor)
+    exp, params_climate, params_anchor = parser_args()
+    main(exp, params_climate, params_anchor)

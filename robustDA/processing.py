@@ -5,7 +5,10 @@ import random
 from copy import deepcopy
 from sklearn.preprocessing import StandardScaler
 
-from robustDA.process_cmip6 import read_forcing_cmip6, compute_forced_response_cmip6
+from robustDA.process_cmip6 import (
+    read_forcing_cmip6,
+    compute_forced_response_cmip6,
+)
 from robustDA.utils.helpers import partition
 
 
@@ -37,17 +40,13 @@ def split_train_test(
     use only models that have the correponding forced response.
     Use modelFull for computing the forced response, not just model.
     """
-    if target in forcings: # sorted not needed
+    if target in forcings:  # sorted not needed
         models = sorted(set([modelsDataList[i].model for i in range(nbFiles)]))
 
         """ Split the models """
         trainModels = np.sort(
-                list(
-                    random.sample(
-                        models, int(np.round(percTrain * len(models)))
-                    )
-                )
-            )
+            list(random.sample(models, int(np.round(percTrain * len(models)))))
+        )
 
         trainFiles = [
             modelsDataList[i].filename
@@ -103,12 +102,8 @@ def split_train_test(
 
         """ Split the models """
         trainModels = np.sort(
-                list(
-                    random.sample(
-                        models, int(np.round(percTrain * len(models)))
-                    )
-                )
-            )
+            list(random.sample(models, int(np.round(percTrain * len(models)))))
+        )
         trainFiles = [
             modelsDataList[i].filename
             for i in range(nbFiles)
