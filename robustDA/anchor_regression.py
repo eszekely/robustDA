@@ -465,7 +465,15 @@ def cross_validation_anchor_regression(
     return lambdaSel, mse_df, corr_pearson, mi, lambdasCV
 
 
-def choose_lambda_pareto(Xs, Ys, lambdavals, maxX=True, maxY=True):
+
+def compute_distance(ideal, pf_X, pf_Y):
+    d = np.zeros([len(pf_X), 1])
+    for i in range(len(pf_X)):
+        d[i] = np.sqrt(0.5*(ideal[0] - pf_X[i])**2 + 0.5*(ideal[1] - pf_Y[i])**2)
+    return d
+
+
+def choose_lambda_pareto(Xs, Ys, lambdavals, maxX=True, maxY=True, plot_var = True):
     """Pareto frontier selection process"""
     Xs = np.abs(Xs)
     Ys = np.abs(Ys)
@@ -482,27 +490,29 @@ def choose_lambda_pareto(Xs, Ys, lambdavals, maxX=True, maxY=True):
             if pair[1] <= pareto_front[-1][1]:
                 pareto_front.append(pair)
 
-    """Plotting process"""
-    plt.scatter(Xs, Ys)
+    ideal = [min(Xs), min(Ys)]
     pf_X = [pair[0] for pair in pareto_front]
     pf_Y = [pair[1] for pair in pareto_front]
-    plt.plot(pf_X, pf_Y)
-    plt.xlabel("Objective 1")
-    plt.ylabel("Objective 2")
-
-    ideal = [min(Xs), min(Ys)]
-    dst = helpers.compute_distance(ideal, pf_X, pf_Y)
+    dst = compute_distance(ideal, pf_X, pf_Y)
     ind = np.argmin(dst)
     lambdaSel = [
         lambdavals[i]
         for i in range(len(lambdavals))
         if (Xs[i] == pf_X[ind]) and (Ys[i] == pf_Y[ind])
     ][0]
-    plt.plot(ideal[0], ideal[1], "k*")
-    plt.plot(pf_X[ind], pf_Y[ind], "ro")
-    plt.show()
 
-    return lambdaSel, pf_X, pf_Y
+    if plot_var:
+        """Plotting process"""
+        plt.scatter(Xs, Ys)
+        plt.plot(pf_X, pf_Y)
+        plt.xlabel("Objective 1")
+        plt.ylabel("Objective 2")
+
+        plt.plot(ideal[0], ideal[1], "k*")
+        plt.plot(pf_X[ind], pf_Y[ind], "ro")
+        plt.show()
+
+    return lambdaSel, pf_X, pf_Y, ind
 
 
 def choose_lambda(mse_df, lambdasCV):

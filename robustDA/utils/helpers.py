@@ -28,10 +28,3 @@ def display_nonlinear_anchors(fct):
         str_fct = "$|A|$"
 
     return str_fct
-
-
-def compute_distance(ideal, pf_X, pf_Y):
-    d = np.zeros([len(pf_X), 1])
-    for i in range(len(pf_X)):
-        d[i] = np.sqrt(0.5*(ideal[0] - pf_X[i])**2 + 0.5*(ideal[1] - pf_Y[i])**2)
-    return d
