@@ -70,13 +70,13 @@ def build_column_space(y_anchor, h_anchors):
             ).reshape(-1)
 
     A_h = np.mat(A_h)  # needed for matrix multiplication
-    #     PA = A_h * np.linalg.inv(np.transpose(A_h) * A_h) * np.transpose(A_h)
-    A_h_std = np.mat(StandardScaler().fit_transform(A_h))
-    PA = (
-        A_h_std
-        * np.linalg.inv(np.transpose(A_h_std) * A_h_std)
-        * np.transpose(A_h_std)
-    )
+    PA = A_h * np.linalg.inv(np.transpose(A_h) * A_h) * np.transpose(A_h)
+    #     A_h_std = np.mat(StandardScaler().fit_transform(A_h))
+    #     PA = (
+    #         A_h_std
+    #         * np.linalg.inv(np.transpose(A_h_std) * A_h_std)
+    #         * np.transpose(A_h_std)
+    #     )
 
     return PA
 
@@ -262,7 +262,7 @@ def anchor_regression(
     h_anchors,
     lambdaSel,
     params_climate,
-    nbSem = 2,
+    nbSem=2,
 ):
 
     coefRaw, y_test_pred, mse = anchor_regression_estimator(
@@ -340,7 +340,7 @@ def cross_validation_anchor_regression(
         displayModels=False,
     )
 
-    lambdasCV = np.logspace(-2, 5, cv_lambda_vals)
+    lambdasCV = np.logspace(-2, 6, cv_lambda_vals)
 
     nbFoldsCV = len(dict_folds["foldsData"])
     mse = np.zeros([len(lambdasCV), nbFoldsCV])
@@ -462,7 +462,7 @@ def cross_validation_anchor_regression(
                 dict_folds["trainFolds"],
             )
 
-    return lambdaSel, mse_df, corr_pearson, mi
+    return lambdaSel, mse_df, corr_pearson, mi, lambdasCV
 
 
 def choose_lambda_pareto(Xs, Ys, lambdavals, maxX=True, maxY=True):
@@ -538,15 +538,27 @@ def choose_lambda(mse_df, lambdasCV):
     return lambdasSelAll, sem_CV
 
 
-def subagging(
-    modelsDataList, modelsInfoFrame, params_climate, params_anchor, nbRuns
-):
+def subagging(params_climate, params_anchor, nbRuns):
+
+    cv_vals = 30
+
     grid = (72, 144)
-    mse_runs = np.zeros([nbRuns, 1])
+    mse_runs = np.zeros([nbRuns, cv_vals])
+    corr_pearson_runs = np.zeros([nbRuns, cv_vals])
+    mi_runs = np.zeros([nbRuns, cv_vals])
     coefRaw_runs = np.zeros([nbRuns, grid[0] * grid[1]])
     lambdaSel_runs = np.zeros([nbRuns, 1])
     trainFiles = []
     testFiles = []
+
+    target = params_climate["target"]
+    anchor = params_climate["anchor"]
+    gamma = params_anchor["gamma"][0]
+    h_anchors = params_anchor["h_anchors"]
+
+    modelsDataList, modelsInfoFrame = read_files_cmip6(
+        params_climate, norm=True
+    )
 
     for r in range(nbRuns):
         print("---- Run = " + str(r) + " ----")
@@ -558,18 +570,19 @@ def subagging(
             params_climate["anchor"],
         )
 
-        print(dict_models["trainModels"])
-        print(dict_models["testModels"])
+        #         print(dict_models["trainModels"])
+        #         print(dict_models["testModels"])
 
         trainFiles.append(dict_models["trainFiles"])
         testFiles.append(dict_models["testFiles"])
 
-        gamma = params_anchor["gamma"]
-        h_anchors = params_anchor["h_anchors"]
-
-        cv_vals = 30
-        display_CV_plot = False
-        lambdaSelAll, mse_df, sem_CV = cross_validation_anchor_regression(
+        (
+            lambdaSel,
+            mse_df,
+            corr_pearson,
+            mi,
+            lambdasCV,
+        ) = cross_validation_anchor_regression(
             modelsDataList,
             modelsInfoFrame,
             deepcopy(dict_models),
@@ -577,7 +590,8 @@ def subagging(
             gamma,
             h_anchors,
             cv_vals,
-            display_CV_plot,
+            sel_method="MSE",
+            display_CV_plot=False,
         )
 
         """ Train with the chosen lambda to learn the coefficients beta,
@@ -586,22 +600,30 @@ def subagging(
 
         nbSem = 2
         coefRaw, y_test_pred, mse = anchor_regression_estimator(
-            dict_models, gamma, h_anchors, lambdaSelAll[nbSem]
+            dict_models, gamma, h_anchors, lambdaSel[nbSem]
         )
 
-        lambdaSel_runs[r] = lambdaSelAll[nbSem]
-        mse_runs[r] = mse
+        lambdaSel_runs[r] = lambdaSel[nbSem]
+        mse_runs[r, :] = mse_df["MSE - TOTAL"].values
+        corr_pearson_runs[r, :] = np.mean(corr_pearson, axis=1)
+        mi_runs[r, :] = np.mean(mi, axis=1)
         coefRaw_runs[r, :] = coefRaw
 
-    mse_runs_df = pd.DataFrame(mse_runs, columns=["MSE"])
+    mse_runs_df = pd.DataFrame(mse_runs)
     mse_runs_df["Lambda selected"] = pd.DataFrame(lambdaSel_runs)
     mse_runs_df.index.name = "Run"
 
-    coefRaw_final = np.sum(coefRaw_runs, axis=0).reshape(-1, 1)
-
-    # mse_df.to_csv("./../output/data/MSE_rcp85_norm_train30_cv5_lambda0_5_100.csv")
-
-    return coefRaw_final, coefRaw_runs, mse_runs_df, trainFiles, testFiles
+    filename = (
+        "./../output/data/subagging_"
+        + target
+        + "_"
+        + anchor
+        + "_gamma_"
+        + str(gamma)
+        + "_square_noAhstd.pkl"
+    )
+    with open(filename, "wb") as f:
+        pickle.dump([coefRaw_runs, mse_runs_df, corr_pearson_runs, mi_runs], f)
 
 
 def param_optimization(params_climate, params_anchor):
@@ -630,27 +652,32 @@ def param_optimization(params_climate, params_anchor):
         for j in range(len(h_anchors)):
             tmp_h_anchors = h_anchors
             print(" ---- " + str(tmp_h_anchors))
-#         for j in range(len(h_anchors) + 1):
-#             tmp_h_anchors = h_anchors[:j]
-#             print(" ---- " + str(tmp_h_anchors))
-#             (
-#                 lambdaSelAll,
-#                 mse_df,
-#                 sem_CV,
-#                 corr_pearson,
-#                 mi,
-#             ) = cross_validation_anchor_regression(
-#                 modelsDataList,
-#                 modelsInfoFrame,
-#                 deepcopy(dict_models),
-#                 params_climate,
-#                 gamma_vals[i],
-#                 tmp_h_anchors,
-#                 cv_vals,
-#                 display_CV_plot=False,
-#             )
+            #         for j in range(len(h_anchors) + 1):
+            #             tmp_h_anchors = h_anchors[:j]
+            #             print(" ---- " + str(tmp_h_anchors))
+            #             (
+            #                 lambdaSelAll,
+            #                 mse_df,
+            #                 sem_CV,
+            #                 corr_pearson,
+            #                 mi,
+            #             ) = cross_validation_anchor_regression(
+            #                 modelsDataList,
+            #                 modelsInfoFrame,
+            #                 deepcopy(dict_models),
+            #                 params_climate,
+            #                 gamma_vals[i],
+            #                 tmp_h_anchors,
+            #                 cv_vals,
+            #                 display_CV_plot=False,
+            #             )
 
-            lambdaSel, mse_df, corr_pearson, mi = cross_validation_anchor_regression(
+            (
+                lambdaSel,
+                mse_df,
+                corr_pearson,
+                mi,
+            ) = cross_validation_anchor_regression(
                 modelsDataList,
                 modelsInfoFrame,
                 deepcopy(dict_models),
@@ -665,7 +692,7 @@ def param_optimization(params_climate, params_anchor):
             mse_gamma[i, j, :] = mse_df.iloc[:, -1].values
             corr_gamma[i, j, :] = np.mean(corr_pearson, axis=1)
             mi_gamma[i, j, :] = np.mean(mi, axis=1)
-            
+
     dirname = "./../output/data/"
     if not os.path.isdir(dirname):
         os.makedirs(dirname)
@@ -705,13 +732,17 @@ def param_optimization(params_climate, params_anchor):
         )
 
 
-def choose_gamma_h_lambda_pareto(Xs, Ys, gamma_vals, h_anchors, lambdavals, maxX=True, maxY=True):
-    '''Pareto frontier selection process'''
+def choose_gamma_h_lambda_pareto(
+    Xs, Ys, gamma_vals, h_anchors, lambdavals, maxX=True, maxY=True
+):
+    """Pareto frontier selection process"""
     Xs = np.abs(Xs)
-    Xsv = Xs.reshape(-1,1)
+    Xsv = Xs.reshape(-1, 1)
     Ys = np.abs(Ys)
-    Ysv = Ys.reshape(-1,1)
-    sorted_list = sorted([[Xsv[i], Ysv[i]] for i in range(len(Xsv))], reverse=maxY)
+    Ysv = Ys.reshape(-1, 1)
+    sorted_list = sorted(
+        [[Xsv[i], Ysv[i]] for i in range(len(Xsv))], reverse=maxY
+    )
     pareto_front = [sorted_list[0]]
     for pair in sorted_list[1:]:
         if maxY:
@@ -720,15 +751,15 @@ def choose_gamma_h_lambda_pareto(Xs, Ys, gamma_vals, h_anchors, lambdavals, maxX
         else:
             if pair[1] <= pareto_front[-1][1]:
                 pareto_front.append(pair)
-    
-    '''Plotting process'''
+
+    """Plotting process"""
     plt.scatter(Xsv, Ysv)
     pf_X = [pair[0] for pair in pareto_front]
     pf_Y = [pair[1] for pair in pareto_front]
     plt.plot(pf_X, pf_Y)
     plt.xlabel("Objective 1")
     plt.ylabel("Objective 2")
-    
+
     ideal = [min(Xsv), min(Ysv)]
     dst = helpers.compute_distance(ideal, pf_X, pf_Y)
     ind = np.argmin(dst)
@@ -736,15 +767,15 @@ def choose_gamma_h_lambda_pareto(Xs, Ys, gamma_vals, h_anchors, lambdavals, maxX
     for i in range(Xs.shape[0]):
         for j in range(Xs.shape[1]):
             for k in range(lambdavals.shape[0]):
-                if (Xs[i,j,k] == pf_X[ind]) and (Ys[i,j,k] == pf_Y[ind]):
+                if (Xs[i, j, k] == pf_X[ind]) and (Ys[i, j, k] == pf_Y[ind]):
                     gammaSel = gamma_vals[i]
                     hSel = h_anchors[:j]
                     lambdaSel = lambdavals[k]
-    
+
     plt.plot(ideal[0], ideal[1], "k*")
     plt.plot(pf_X[ind], pf_Y[ind], "ro")
     plt.show()
-    
+
     return gammaSel, hSel, lambdaSel, pf_X, pf_Y
 
 

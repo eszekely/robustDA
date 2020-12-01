@@ -25,6 +25,7 @@ from anchor_regression import (
     run_anchor_regression_all,
     param_optimization,
     param_optimization_gamma,
+    subagging,
 )
 from parse_args import args_climate, args_anchor
 
@@ -69,6 +70,9 @@ def main(exp, params_climate, params_anchor):
         param_optimization(params_climate, params_anchor)
     elif exp == "param_opt_gamma":
         param_optimization_gamma(params_climate, params_anchor)
+    elif exp == "subagging":
+        nbRuns = 20
+        subagging(params_climate, params_anchor, nbRuns)
 
 
 if __name__ == "__main__":
