@@ -71,12 +71,12 @@ def build_column_space(y_anchor, h_anchors):
 
     A_h = np.mat(A_h)  # needed for matrix multiplication
     PA = A_h * np.linalg.inv(np.transpose(A_h) * A_h) * np.transpose(A_h)
-    #     A_h_std = np.mat(StandardScaler().fit_transform(A_h))
-    #     PA = (
-    #         A_h_std
-    #         * np.linalg.inv(np.transpose(A_h_std) * A_h_std)
-    #         * np.transpose(A_h_std)
-    #     )
+#     A_h_std = np.mat(StandardScaler().fit_transform(A_h))
+#     PA = (
+#         A_h_std
+#         * np.linalg.inv(np.transpose(A_h_std) * A_h_std)
+#         * np.transpose(A_h_std)
+#     )
 
     return PA
 
@@ -217,6 +217,7 @@ def run_anchor_regression(
 ):
 
     cv_vals = 50
+    sel_method = "MSE"
 
     (
         lambdaSelAll,
@@ -232,6 +233,7 @@ def run_anchor_regression(
         gamma,
         h_anchors,
         cv_vals,
+        sel_method,
         display_CV_plot,
     )
 
@@ -295,7 +297,7 @@ def anchor_regression(
         #         + str(nbSem)
         #         + "SEM-"
         + str(np.round(lambdaSel, 2))
-        + ".pdf"
+        + "_noAhStd.pdf"
     )
 
     make_plots(
@@ -319,7 +321,7 @@ def cross_validation_anchor_regression(
     gamma,
     h_anchors,
     cv_lambda_vals,
-    sel_method="pareto",
+    sel_method="MSE",
     display_CV_plot=False,
 ):
 
@@ -452,7 +454,7 @@ def cross_validation_anchor_regression(
                 + "nonlinear-h_"
                 + str(len(h_anchors))
                 + "-".join(h_anchors)
-                + "_CV.pdf"
+                + "_CV_noAhStd.pdf"
             )
             plot_CV(
                 mse_df,
