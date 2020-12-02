@@ -13,4 +13,5 @@ dependencies:
     - scikit-learn
     - netCDF4
     - cartopy
+    - seaborn
     
