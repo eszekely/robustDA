@@ -3,6 +3,9 @@ import numpy as np
 import os
 import pandas as pd
 
+dirFiles = "/net/ch4/data/cmip6-Next_Generation/tas/ann/g025/"
+# dirFiles = "./../data/mount/CMIP6/"
+
 
 class ClimateModelData:
     def __init__(self, filename, data):
@@ -40,10 +43,9 @@ def read_files_cmip6(params_climate, norm=True):
 
     for var in variables:
         if var == "tas":
-            dirFiles = "./../data/mount/CMIP6/"
             files = sorted(os.listdir(dirFiles))
         elif var == "pr":
-            dirFiles = "./../data/mount/_DATA/CMIP5/2D/pr/"
+            #             dirFiles = "./../data/mount/_DATA/CMIP5/2D/pr/"
             files = sorted(os.listdir(dirFiles))
 
         for filename in files:
@@ -79,7 +81,7 @@ def read_files_cmip6(params_climate, norm=True):
                                     temp_ncdata, index=dates
                                 )
                                 temp_ncdata_df_selDates = temp_ncdata_df.loc[
-                                    str(startDate):str(endDate)
+                                    str(startDate) : str(endDate)
                                 ]
 
                                 if norm:
@@ -252,7 +254,6 @@ def compute_forced_response_cmip6(
 ):
     modelsDataList = []
 
-    dirFiles = "./../data/mount/CMIP6/"
     files = sorted(os.listdir(dirFiles))
 
     for var in variables:
@@ -286,7 +287,7 @@ def compute_forced_response_cmip6(
                     if len(dates) == len(set(dates)):
                         temp_ncdata_df = pd.DataFrame(temp_ncdata, index=dates)
                         temp_ncdata_df_selDates = temp_ncdata_df.loc[
-                            str(startDate):str(endDate)
+                            str(startDate) : str(endDate)
                         ]
 
                         if norm:

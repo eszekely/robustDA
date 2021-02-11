@@ -6,7 +6,7 @@ def args_climate(args):
         "temporalRes": "ann",
         "variables": ["tas"],
         "scenarios": ["historical", "piControl"],
-        "startDate": 1850,
+        "startDate": 1980,
         "endDate": 2014,
         "target": args.target,
         "anchor": args.anchor,
