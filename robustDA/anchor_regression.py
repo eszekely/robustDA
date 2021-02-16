@@ -71,12 +71,12 @@ def build_column_space(y_anchor, h_anchors):
 
     A_h = np.mat(A_h)  # needed for matrix multiplication
     PA = A_h * np.linalg.inv(np.transpose(A_h) * A_h) * np.transpose(A_h)
-#     A_h_std = np.mat(StandardScaler().fit_transform(A_h))
-#     PA = (
-#         A_h_std
-#         * np.linalg.inv(np.transpose(A_h_std) * A_h_std)
-#         * np.transpose(A_h_std)
-#     )
+    #     A_h_std = np.mat(StandardScaler().fit_transform(A_h))
+    #     PA = (
+    #         A_h_std
+    #         * np.linalg.inv(np.transpose(A_h_std) * A_h_std)
+    #         * np.transpose(A_h_std)
+    #     )
 
     return PA
 
@@ -467,15 +467,18 @@ def cross_validation_anchor_regression(
     return lambdaSel, mse_df, corr_pearson, mi, lambdasCV
 
 
-
 def compute_distance(ideal, pf_X, pf_Y):
     d = np.zeros([len(pf_X), 1])
     for i in range(len(pf_X)):
-        d[i] = np.sqrt(0.5*(ideal[0] - pf_X[i])**2 + 0.5*(ideal[1] - pf_Y[i])**2)
+        d[i] = np.sqrt(
+            0.5 * (ideal[0] - pf_X[i]) ** 2 + 0.5 * (ideal[1] - pf_Y[i]) ** 2
+        )
     return d
 
 
-def choose_lambda_pareto(Xs, Ys, lambdavals, maxX=True, maxY=True, plot_var = True):
+def choose_lambda_pareto(
+    Xs, Ys, lambdavals, maxX=True, maxY=True, plot_var=True
+):
     """Pareto frontier selection process"""
     Xs = np.abs(Xs)
     Ys = np.abs(Ys)
@@ -552,7 +555,7 @@ def choose_lambda(mse_df, lambdasCV):
 
 def subagging(params_climate, params_anchor, nbRuns):
 
-    cv_vals = 30
+    cv_vals = 10
 
     grid = (72, 144)
     mse_runs = np.zeros([nbRuns, cv_vals])
@@ -634,6 +637,10 @@ def subagging(params_climate, params_anchor, nbRuns):
         + str(gamma)
         + "_square_noAhstd.pkl"
     )
+
+    dirname = "./../output/data/"
+    if not os.path.isdir(dirname):
+        os.makedirs(dirname)
     with open(filename, "wb") as f:
         pickle.dump([coefRaw_runs, mse_runs_df, corr_pearson_runs, mi_runs], f)
 
