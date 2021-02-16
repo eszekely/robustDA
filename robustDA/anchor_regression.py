@@ -12,47 +12,41 @@ from sklearn import linear_model
 from sklearn.feature_selection import mutual_info_regression
 from scipy import stats
 
-from robustDA.process_cmip6 import read_files_cmip6
+from robustDA.process_cmip6 import read_files_cmip6, read_forcing_cmip6
 from robustDA.processing import split_train_test, split_folds_CV
-from robustDA.plots import make_plots, plot_CV
+from robustDA.plots import make_plots, plot_CV_sem, plot_CV_multipleMSE
 from robustDA.utils import helpers
 
 
 def standardize(dict_models):
-    X_train = dict_models["X_train"]
-    y_train = dict_models["y_train"]
-    y_anchor_train = dict_models["y_anchor_train"]
+    X_train = dict_models["X_train"].values
+    y_train = dict_models["y_train"].values
+    y_anchor_train = dict_models["y_anchor_train"].values
 
-    X_test = dict_models["X_test"]
-    y_test = dict_models["y_test"]
-    y_anchor_test = dict_models["y_anchor_test"]
+    X_test = dict_models["X_test"].values
+    y_test = dict_models["y_test"].values
+    y_anchor_test = dict_models["y_anchor_test"].values
 
     # Create a scaler object
     sc_X = StandardScaler(with_mean=True, with_std=True)
     sc_y = StandardScaler(with_mean=True, with_std=True)
-    sc_y_anchor = StandardScaler(with_mean=True, with_std=True)
     sc_X_test = StandardScaler(with_mean=True, with_std=True)
     sc_y_test = StandardScaler(with_mean=True, with_std=True)
-    sc_y_anchor_test = StandardScaler(with_mean=True, with_std=True)
 
     # Fit the scaler to the data and transform
-    X_train_std = sc_X.fit_transform(X_train.values)
-    y_train_std = sc_y.fit_transform(y_train.values)
-    y_anchor_train_std = sc_y_anchor.fit_transform(y_anchor_train.values)
-    X_test_std = sc_X_test.fit_transform(X_test.values)
-    y_test_std = sc_y_test.fit_transform(y_test.values)
-    y_anchor_test_std = sc_y_anchor_test.fit_transform(y_anchor_test.values)
+    X_train_std = sc_X.fit_transform(X_train)
+    y_train_std = sc_y.fit_transform(y_train)
+    X_test_std = sc_X_test.fit_transform(X_test)
+    y_test_std = sc_y_test.fit_transform(y_test)
 
     X = X_train_std
     y = y_train_std
-    y_anchor = y_anchor_train_std
-    Xt = X_test_std
-    yt = y_test_std
-    yt_anchor = y_anchor_test_std
+    X_test = X_test_std
+    y_test = y_test_std
 
     std_X_train = X_train.std(axis=0)
 
-    return X, y, y_anchor, Xt, yt, yt_anchor, std_X_train
+    return X, y, y_anchor_train, X_test, y_test, y_anchor_test, std_X_train
 
 
 def build_column_space(y_anchor, h_anchors):
@@ -60,10 +54,14 @@ def build_column_space(y_anchor, h_anchors):
     Build the column space of A using nonlinear functions
     for a given (one) anchor source
     """
-    A_h = np.zeros((y_anchor.shape[0], len(h_anchors) + 1))
+    if h_anchors is None:
+        A_h = np.zeros((y_anchor.shape[0], 1))
+    else:
+        A_h = np.zeros((y_anchor.shape[0], len(h_anchors) + 1))
+
     A_h[:, 0] = y_anchor.reshape(-1)
 
-    if len(h_anchors) > 0:
+    if h_anchors is not None:
         for i in range(len(h_anchors)):
             A_h[:, i + 1] = helpers.nonlinear_anchors(
                 y_anchor, h_anchors[i]
@@ -71,12 +69,6 @@ def build_column_space(y_anchor, h_anchors):
 
     A_h = np.mat(A_h)  # needed for matrix multiplication
     PA = A_h * np.linalg.inv(np.transpose(A_h) * A_h) * np.transpose(A_h)
-#     A_h_std = np.mat(StandardScaler().fit_transform(A_h))
-#     PA = (
-#         A_h_std
-#         * np.linalg.inv(np.transpose(A_h_std) * A_h_std)
-#         * np.transpose(A_h_std)
-#     )
 
     return PA
 
@@ -106,7 +98,7 @@ def transformed_anchor_matrices(X, y, y_anchor, gamma, h_anchors):
 
 
 def anchor_regression_estimator(
-    dict_models, gamma, h_anchors, regLambda, method="ridge"
+    dict_models, gamma, h_anchors, regLambda, method="ridge", pred = "original"
 ):
     """ Standardize the data before anchor regression """
     X, y, y_anchor, Xt, yt, yt_anchor, std_X_train = standardize(dict_models)
@@ -147,9 +139,11 @@ def anchor_regression_estimator(
         coefRaw = coefStd.T / np.array(std_X_train).reshape(p, 1)
 
         y_test_pred = np.array(np.matmul(Xt, coefStd.T))
+        
+    y_test_pred = StandardScaler().fit(dict_models["y_test"]).inverse_transform(y_test_pred)   
 
     mse = np.mean((yt - y_test_pred) ** 2)
-
+    
     return coefRaw, y_test_pred, mse
 
 
@@ -332,6 +326,7 @@ def cross_validation_anchor_regression(
         ]
     )
 
+    ''' Leave-one-model-out CV '''
     dict_folds = split_folds_CV(
         modelsDataList,
         modelsInfoFrame,
@@ -421,42 +416,52 @@ def cross_validation_anchor_regression(
     mse_df.index.name = "Lambda"
 
     if sel_method == "pareto":
-        lambdaSel, _, _ = choose_lambda_pareto(
+        lambdaSel, _, _, _ = choose_lambda_pareto(
             mse_df.iloc[:, -1].values,
             np.mean(corr_pearson, axis=1),
             mse_df.index,
             maxX=False,
             maxY=False,
         )
-
+    elif sel_method == "multipleMSE":
+        lambdaSel = choose_lambda_multipleMSE(mse_df, lambdasCV)
+        
     elif sel_method == "MSE":
         lambdaSel, sem_CV = choose_lambda(mse_df, lambdasCV)
 
-        if display_CV_plot:
-            filename = (
-                "target_"
-                + params_climate["target"]
-                + "_"
-                + "anchor_"
-                + params_climate["anchor"]
-                + "_"
-                + "-".join(params_climate["variables"])
-                + "_"
-                + "-".join(params_climate["scenarios"])
-                + "_"
-                + str(params_climate["startDate"])
-                + "_"
-                + str(params_climate["endDate"])
-                + "_"
-                + "gamma_"
-                + str(gamma)
-                + "_"
-                + "nonlinear-h_"
-                + str(len(h_anchors))
-                + "-".join(h_anchors)
-                + "_CV_noAhStd.pdf"
-            )
-            plot_CV(
+    if display_CV_plot:
+        filename = (
+            "target_"
+            + params_climate["target"]
+            + "_"
+            + "anchor_"
+            + params_climate["anchor"]
+            + "_"
+            + "-".join(params_climate["variables"])
+            + "_"
+            + "-".join(params_climate["scenarios"])
+            + "_"
+            + str(params_climate["startDate"])
+            + "_"
+            + str(params_climate["endDate"])
+            + "_"
+            + "gamma_"
+            + str(gamma)
+            + "_"
+            + "nonlinear-h_"
+            + str(len(h_anchors))
+            + "-".join(h_anchors)
+            + "_CV_noAhStd.pdf"
+        )
+        if sel_method == "multipleMSE":
+            plot_CV_multipleMSE(
+                mse_df,
+                lambdaSel,
+                filename,
+                dict_folds["trainFolds"],
+            )            
+        elif sel_method == "MSE":
+            plot_CV_sem(
                 mse_df,
                 lambdaSel,
                 sem_CV,
@@ -550,23 +555,61 @@ def choose_lambda(mse_df, lambdasCV):
     return lambdasSelAll, sem_CV
 
 
+def choose_lambda_multipleMSE(mse_df, lambdasCV):
+    mse_total = mse_df["MSE - TOTAL"]
+
+    mult = [1.05, 1.10]
+    
+    lambdaOpt = mse_total[mse_total == np.min(mse_total)].index[0]
+    mse_total_sel = mse_total[lambdaOpt:]
+
+    lambdasSelAll = np.zeros(len(mult) + 1)
+    lambdasSelAll[0] = lambdaOpt
+
+    """ Compute lambda for different multiplication factors """
+    for j in range(len(mult)):
+        lambdaSel = mse_total_sel[
+            mse_total_sel
+            == np.max(
+                mse_total_sel[
+                    mse_total_sel
+                    <= mult[j] * np.min(mse_total_sel)
+                ]
+            )
+        ].index[0]
+        lambdasSelAll[j + 1] = lambdaSel
+
+    return lambdasSelAll
+
+
 def subagging(params_climate, params_anchor, nbRuns):
 
     cv_vals = 30
 
+    print("Subagging")
+
+    target = params_climate["target"]
+    anchor = params_climate["anchor"]
+    startDate = params_climate["startDate"]
+    endDate = params_climate["endDate"]
+    gamma = params_anchor["gamma"][0]
+    h_anchors = params_anchor["h_anchors"]
+
     grid = (72, 144)
+    nbYears = endDate - startDate + 1
+    
     mse_runs = np.zeros([nbRuns, cv_vals])
     corr_pearson_runs = np.zeros([nbRuns, cv_vals])
     mi_runs = np.zeros([nbRuns, cv_vals])
     coefRaw_runs = np.zeros([nbRuns, grid[0] * grid[1]])
+    y_test_pred_runs = [[] for i in range(nbRuns)]
     lambdaSel_runs = np.zeros([nbRuns, 1])
     trainFiles = []
     testFiles = []
 
-    target = params_climate["target"]
-    anchor = params_climate["anchor"]
-    gamma = params_anchor["gamma"][0]
-    h_anchors = params_anchor["h_anchors"]
+    yf = read_forcing_cmip6("historical", target, startDate, endDate)
+    testStatistic_null = []
+    testStatistic_alt = []
 
     modelsDataList, modelsInfoFrame = read_files_cmip6(
         params_climate, norm=True
@@ -620,7 +663,16 @@ def subagging(params_climate, params_anchor, nbRuns):
         corr_pearson_runs[r, :] = np.mean(corr_pearson, axis=1)
         mi_runs[r, :] = np.mean(mi, axis=1)
         coefRaw_runs[r, :] = coefRaw
-
+        y_test_pred_runs[r].append(y_test_pred)
+        
+        for i in range(len(dict_models["testFiles"])):
+            if dict_models["testFiles"][i].split("_")[3] == "piControl":
+                testStatistic_null.append(np.corrcoef(np.transpose(y_test_pred[i * nbYears: (i+1) * nbYears]), 
+                                np.transpose(yf.values.reshape(-1,1)))[0, 1])
+            elif dict_models["testFiles"][i].split("_")[3] != "piControl":
+                testStatistic_alt.append(np.corrcoef(np.transpose(y_test_pred[i * nbYears: (i+1) * nbYears]), 
+                                np.transpose(yf.values.reshape(-1,1)))[0, 1])
+        
     mse_runs_df = pd.DataFrame(mse_runs)
     mse_runs_df["Lambda selected"] = pd.DataFrame(lambdaSel_runs)
     mse_runs_df.index.name = "Run"
@@ -635,7 +687,8 @@ def subagging(params_climate, params_anchor, nbRuns):
         + "_square_noAhstd.pkl"
     )
     with open(filename, "wb") as f:
-        pickle.dump([coefRaw_runs, mse_runs_df, corr_pearson_runs, mi_runs], f)
+        pickle.dump([lambdaSel_runs, coefRaw_runs, mse_runs_df, corr_pearson_runs, mi_runs, y_test_pred_runs,
+                     testStatistic_null, testStatistic_alt], f)
 
 
 def param_optimization(params_climate, params_anchor):
