@@ -110,10 +110,7 @@ def make_plots(
     filename=None,
 ):
 
-    y_test = dict_models["y_test"]
-    sc_y_test = StandardScaler(with_mean=True, with_std=True)
-    y_test_std = sc_y_test.fit_transform(y_test.values)
-    y_test_true = y_test_std
+    y_test_true = dict_models["y_test"].values
 
     # Standardize ?
     y_anchor_test = dict_models["y_anchor_test"]
@@ -241,10 +238,57 @@ def make_plots(
             bbox_inches="tight",
         )
 
+#     plt.close()
+
+
+def plot_CV_multipleMSE(mse_df, lambdasSelAll, filename, folds):
+    nbStd = np.array([5, 10])
+    clr = ["r", "b"]
+
+    fig = plt.figure(figsize=(7, 4))
+    # suptitle = "Cross validation (anchor regression γ = "
+    # + str(gamma) + "): " + variables[0].upper() + " -- "
+    # + target.upper() + " forcing [" + ', '.join(scenarios) + "] (" + \
+    #             str(startDate) + " - " + str(endDate) + ") \n"
+    # fig.suptitle(suptitle, fontsize = 18)
+
+    for i in range(mse_df.shape[1] - 1):
+        plt.plot(mse_df.index, mse_df.iloc[:, i], label="_nolegend_")
+    #         ax1.plot(mse_df.index, mse_df.iloc[:, i], label=folds[i])
+
+    plt.plot(mse_df.index, mse_df.iloc[:, i + 1], "k.-")
+
+    plt.axvline(
+        lambdasSelAll[0],
+        ls="--",
+        color="k",
+        label="$\\lambda_{opt}$ = " + str(np.round(lambdasSelAll[0], 2)),
+    )
+
+    for j in range(len(lambdasSelAll) - 1):
+        plt.axvline(
+            lambdasSelAll[j + 1],
+            color=clr[j],
+            label="$\\lambda_{"
+            + str(nbStd[j])
+            + " \%MSE} $ = "
+            + str(np.round(lambdasSelAll[j + 1], 2)),
+        )
+
+    plt.xscale("log")
+    plt.yscale("log")
+    plt.ylabel("Mean Squared Error (MSE)", fontsize=14)
+    plt.xlabel("$\\lambda$", fontsize=14)
+    plt.legend(fontsize=10)
+
+    if not os.path.isdir("./../output/figures/"):
+        os.makedirs("./../output/figures/")
+    fig.savefig("./../output/figures/" + filename, bbox_inches="tight")
+
     plt.close()
 
-
-def plot_CV(mse_df, lambdasSelAll, sem_CV, filename, folds):
+    
+def plot_CV_sem(mse_df, lambdasSelAll, sem_CV, filename, folds):
     nbStd = np.array([1, 2, 3])
     clr = ["r", "b", "k"]
 

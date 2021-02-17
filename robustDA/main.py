@@ -71,7 +71,7 @@ def main(exp, params_climate, params_anchor):
     elif exp == "param_opt_gamma":
         param_optimization_gamma(params_climate, params_anchor)
     elif exp == "subagging":
-        nbRuns = 20
+        nbRuns = 10
         subagging(params_climate, params_anchor, nbRuns)
 
 
