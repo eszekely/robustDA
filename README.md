@@ -21,7 +21,7 @@ Run using python3 with the parameters: target, anchor, gamma, nonlinear_anchors
 
 ```bash
 python3 main.py --help
-python3 main.py --target aerosols --anchor co2 --gamma 1 1000 --nonlinear_anchors square abs
+python3 main.py --exp param_opt --target aerosols --anchor co2 --gamma 1 1000 --nonlinear_anchors square abs
 ```
 
 Run the jupyter notebook:
