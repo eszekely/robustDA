@@ -63,7 +63,7 @@ def parser_args(input_params):
 
 def get_parameters():
 
-    with open("params.yml") as file:
+    with open("./../params.yml") as file:
         input_params = yaml.full_load(file)
 
     exp, params_climate, params_anchor = parser_args(input_params)
