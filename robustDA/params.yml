@@ -1,0 +1,29 @@
+# Input parameters
+
+Parameters: >
+    =============================================================================
+    Variables: tas, pr
+    Temporal resolutions: ann, mon, day
+    Grid size at 2.5 degrees: g025
+    Scenarios CMIP6: historical, hist-GHG, hist-aer, hist-nat, piControl,
+                     ssp119, ssp126, ssp245, ssp370, ssp434, ssp460, ssp585,
+                     (1pctCO2, abrupt-2xCO2, abrupt-4xCO2,
+                     esm-hist, esm-ssp585, esm-1pctCO2, hist-bgc, land-hist,
+                     ssp534-over, ssp534-over-bgc, ssp585-bgc, 1pctCO2-bgc)
+    Start date for CMIP6: 1850
+    Target: 1) forcing (from ERF files): total, total_anthropogenic, GHG, CO2,
+                                         aerosols, total_natural, volcanic, solar
+            2) forced response (computed from the one forcing runs):
+                                         hist-aer, hist-GHG, hist-nat
+    =============================================================================
+
+temporalRes: ann
+variables: [tas]
+scenarios: [historical, piControl] 
+startDate: 1850
+endDate: 2014
+target: aerosols
+anchor: co2
+
+gamma: [1000] # list of gamma values
+nonlinear_anchors: [] # list of nonlinear anchors
