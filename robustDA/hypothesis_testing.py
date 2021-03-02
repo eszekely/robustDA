@@ -21,8 +21,8 @@ def test_DA(params_climate, params_anchor):
     gamma = params_anchor["gamma"][0]
     h_anchors = params_anchor["h_anchors"]
 
-    B = 2
-    cv_vals = 3
+    B = 20
+    cv_vals = 30
     grid = (72, 144)
 
     mse_runs = np.zeros([B, cv_vals])
