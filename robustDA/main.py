@@ -42,18 +42,15 @@ def parser_args(input_params):
 
     parser.add_argument("--exp", help="The experiment to run")
 
-    for arg, arg_val in input_params.items():
+    for arg, val in input_params.items():
         parser.add_argument(
             "-%s" % arg,
-            type=eval(arg_val["type"]),
-            help=arg_val["help"],
-            default=arg_val["default"],
+            type = type(val),
+            default = val,
         )
 
     args = parser.parse_args()
-    print(args)
     exp = args.exp
-    print(exp)
     params_climate, params_anchor = args_params(args)
     print(params_climate)
     print(params_anchor)

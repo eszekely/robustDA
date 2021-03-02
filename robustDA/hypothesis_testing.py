@@ -1,6 +1,8 @@
 import numpy as np
+import pandas as pd
 import pickle
 import os
+import sys
 
 from copy import deepcopy
 
@@ -19,11 +21,20 @@ def test_DA(params_climate, params_anchor):
     gamma = params_anchor["gamma"][0]
     h_anchors = params_anchor["h_anchors"]
 
+    B = 2
+    cv_vals = 3
+    grid = (72, 144)
+
+    mse_runs = np.zeros([B, cv_vals])
+    corr_pearson_runs = np.zeros([B, cv_vals])
+    mi_runs = np.zeros([B, cv_vals])
+    coefRaw_runs = np.zeros([B, grid[0] * grid[1]])
+    y_test_pred_runs = [[] for i in range(B)]
+    lambdaSel_runs = np.zeros([B, 1])
+
     modelsDataList, modelsInfoFrame = read_files_cmip6(
         params_climate, norm=True
     )
-
-    B = 20
 
     nbFiles = len(modelsDataList)
     models = sorted(set([modelsDataList[i].model for i in range(nbFiles)]))
@@ -32,14 +43,15 @@ def test_DA(params_climate, params_anchor):
     power_bagging = np.zeros(len(models))
     nb_models_bagging = np.zeros(len(models))
 
+    filename = "HT_" + target + "_" + anchor + "_gamma_" + str(gamma)
+
+    sys.stdout = open("./../output/logFiles/" + filename + ".log", "w")
+
     for b in range(B):
-        print("Bag " + str(b))
+        print("\n\n ============== Bag " + str(b) + " =================== \n")
         dict_models = split_train_test(
             modelsDataList, modelsInfoFrame, target, anchor
         )
-
-        #         print(dict_models["trainModels"])
-        #         print(dict_models["testModels"])
 
         (
             lambdaSel,
@@ -54,7 +66,7 @@ def test_DA(params_climate, params_anchor):
             params_climate,
             gamma,
             h_anchors,
-            30,
+            cv_vals,
             sel_method="MSE",
             display_CV_plot=True,
         )
@@ -62,6 +74,13 @@ def test_DA(params_climate, params_anchor):
         coefRaw, y_test_pred, mse = anchor_regression_estimator(
             dict_models, gamma, h_anchors, lambdaSel[2]
         )
+
+        lambdaSel_runs[b] = lambdaSel[2]
+        mse_runs[b, :] = mse_df["MSE - TOTAL"].values
+        corr_pearson_runs[b, :] = np.mean(corr_pearson, axis=1)
+        mi_runs[b, :] = np.mean(mi, axis=1)
+        coefRaw_runs[b, :] = coefRaw
+        y_test_pred_runs[b].append(y_test_pred)
 
         alpha_per_bag, power_per_bag, nb_models_per_bag = test_DA_per_bag(
             params_climate, models, dict_models, y_test_pred
@@ -88,14 +107,32 @@ def test_DA(params_climate, params_anchor):
         ]
     )
 
+    mse_runs_df = pd.DataFrame(mse_runs)
+    mse_runs_df["Lambda selected"] = pd.DataFrame(lambdaSel_runs)
+    mse_runs_df.index.name = "Run"
+
     dirname = "./../output/data/"
-    filename = "./../output/data/HT_aerosols_co2_gamma1000.pkl"
     if not os.path.isdir(dirname):
         os.makedirs(dirname)
-    with open(filename, "wb") as f:
+
+    with open(dirname + filename + ".pkl", "wb") as f:
         pickle.dump(
-            [alpha_bagging, power_bagging, nb_models_bagging, models], f
+            [
+                lambdaSel_runs,
+                coefRaw_runs,
+                mse_runs_df,
+                corr_pearson_runs,
+                mi_runs,
+                y_test_pred_runs,
+                alpha_bagging,
+                power_bagging,
+                nb_models_bagging,
+                models,
+            ],
+            f,
         )
+
+    sys.stdout.close()
 
     return alpha_bagging, power_bagging, nb_models_bagging, models
 
