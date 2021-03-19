@@ -410,7 +410,7 @@ def plot_CV_multipleMSE(mse_df, lambdasSelAll, filename, folds):
             color=clr[j],
             label="$\\lambda_{"
             + str(nbStd[j])
-            + " SEM} $ = "
+            + " MSE} $ = "
             + str(np.round(lambdasSelAll[j + 1], 2)),
         )
 
@@ -518,7 +518,7 @@ def plot_CV_pareto(mse_df, lambdasSelAll, filename, folds):
             color=clr[j],
             label="$\\lambda_{"
             + str(nbStd[j])
-            + "SEM} $ = "
+            + " MSE} $ = "
             + str(np.round(lambdasSelAll[j + 1], 2)),
         )
 
@@ -533,3 +533,65 @@ def plot_CV_pareto(mse_df, lambdasSelAll, filename, folds):
     fig.savefig("./../output/figures/" + filename, bbox_inches="tight")
 
     plt.close()
+
+
+def plot_Pareto_fronts(
+    mse, corr, mi, gamma_vals, lambda_vals, ind_opt_gamma, ind_opt_lambda
+):
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(20, 5.4))
+
+    for i in range(mse.shape[0]):
+        ax1.plot(
+            mse[i, :],
+            corr[i, :],
+            ".-",
+            label="$\\gamma = $ " + str(gamma_vals[i]),
+        )
+    ax1.plot(
+        mse[ind_opt_gamma, ind_opt_lambda],
+        corr[ind_opt_gamma, ind_opt_lambda],
+        "rs",
+    )
+    ax1.set_xscale("log")
+    ax1.set_xlabel("Mean squared error (MSE)", fontsize=14)
+    ax1.set_ylabel(
+        "Correlation of residuals with the anchor ($\\rho$)", fontsize=14
+    )
+
+    for i in range(mse.shape[0]):
+        ax2.plot(
+            mse[i, :],
+            mi[i, :],
+            ".-",
+            label="$\\gamma = $ " + str(gamma_vals[i]),
+        )
+    ax2.plot(
+        mse[ind_opt_gamma, ind_opt_lambda],
+        mi[ind_opt_gamma, ind_opt_lambda],
+        "rs",
+    )
+    ax2.set_xscale("log")
+    ax2.set_xlabel("Mean squared error (MSE)", fontsize=14)
+    ax2.set_ylabel(
+        "Mutual information of residuals with the anchor ($I$)", fontsize=14
+    )
+
+    for i in range(mse.shape[0]):
+        ax3.plot(
+            mi[i, :],
+            corr[i, :],
+            ".-",
+            label="$\\gamma = $ " + str(gamma_vals[i]),
+        )
+    ax3.plot(
+        mi[ind_opt_gamma, ind_opt_lambda],
+        corr[ind_opt_gamma, ind_opt_lambda],
+        "rs",
+    )
+    ax3.set_xlabel(
+        "Mutual information of residuals with the anchor ($I$)", fontsize=14
+    )
+    ax3.set_ylabel(
+        "Correlation of residuals with the anchor ($\\rho$)", fontsize=14
+    )
+    ax3.legend(bbox_to_anchor=(1.03, 1.023), loc="upper left", fontsize=12)
