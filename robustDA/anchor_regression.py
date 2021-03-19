@@ -14,7 +14,12 @@ from scipy import stats
 
 from robustDA.process_cmip6 import read_files_cmip6, read_forcing_cmip6
 from robustDA.processing import split_train_test, split_folds_CV
-from robustDA.plots import make_plots, plot_CV_sem, plot_CV_multipleMSE
+from robustDA.plots import (
+    make_plots,
+    plot_CV_sem,
+    plot_CV_multipleMSE,
+    plot_CV_pareto,
+)
 from robustDA.utils import helpers
 
 
@@ -104,7 +109,7 @@ def transformed_anchor_matrices(X, y, y_anchor, gamma, h_anchors):
 
 
 def anchor_regression_estimator(
-    dict_models, gamma, h_anchors, regLambda, method="ridge", pred = "original"
+    dict_models, gamma, h_anchors, regLambda, method="ridge", pred="original"
 ):
     """ Standardize the data before anchor regression """
     X, y, y_anchor, Xt, yt, yt_anchor, std_X_train = standardize(dict_models)
@@ -145,11 +150,15 @@ def anchor_regression_estimator(
         coefRaw = coefStd.T / np.array(std_X_train).reshape(p, 1)
 
         y_test_pred = np.array(np.matmul(Xt, coefStd.T))
-        
-    y_test_pred = StandardScaler().fit(dict_models["y_test"]).inverse_transform(y_test_pred)   
+
+    y_test_pred = (
+        StandardScaler()
+        .fit(dict_models["y_test"])
+        .inverse_transform(y_test_pred)
+    )
 
     mse = np.mean((yt - y_test_pred) ** 2)
-    
+
     return coefRaw, y_test_pred, mse
 
 
@@ -332,7 +341,7 @@ def cross_validation_anchor_regression(
         ]
     )
 
-    ''' Leave-one-model-out CV '''
+    """ Leave-one-model-out CV """
     dict_folds = split_folds_CV(
         modelsDataList,
         modelsInfoFrame,
@@ -431,7 +440,7 @@ def cross_validation_anchor_regression(
         )
     elif sel_method == "multipleMSE":
         lambdaSel = choose_lambda_multipleMSE(mse_df, lambdasCV)
-        
+
     elif sel_method == "MSE":
         lambdaSel, sem_CV = choose_lambda(mse_df, lambdasCV)
 
@@ -465,12 +474,19 @@ def cross_validation_anchor_regression(
                 lambdaSel,
                 filename,
                 dict_folds["trainFolds"],
-            )            
+            )
         elif sel_method == "MSE":
             plot_CV_sem(
                 mse_df,
                 lambdaSel,
                 sem_CV,
+                filename,
+                dict_folds["trainFolds"],
+            )
+        elif sel_method == "pareto":
+            plot_CV_pareto(
+                mse_df,
+                lambdaSel,
                 filename,
                 dict_folds["trainFolds"],
             )
@@ -568,7 +584,7 @@ def choose_lambda_multipleMSE(mse_df, lambdasCV):
     mse_total = mse_df["MSE - TOTAL"]
 
     mult = [1.05, 1.10]
-    
+
     lambdaOpt = mse_total[mse_total == np.min(mse_total)].index[0]
     mse_total_sel = mse_total[lambdaOpt:]
 
@@ -580,10 +596,7 @@ def choose_lambda_multipleMSE(mse_df, lambdasCV):
         lambdaSel = mse_total_sel[
             mse_total_sel
             == np.max(
-                mse_total_sel[
-                    mse_total_sel
-                    <= mult[j] * np.min(mse_total_sel)
-                ]
+                mse_total_sel[mse_total_sel <= mult[j] * np.min(mse_total_sel)]
             )
         ].index[0]
         lambdasSelAll[j + 1] = lambdaSel
@@ -606,7 +619,7 @@ def subagging(params_climate, params_anchor, nbRuns):
 
     grid = (72, 144)
     nbYears = endDate - startDate + 1
-    
+
     mse_runs = np.zeros([nbRuns, cv_vals])
     corr_pearson_runs = np.zeros([nbRuns, cv_vals])
     mi_runs = np.zeros([nbRuns, cv_vals])
@@ -673,15 +686,27 @@ def subagging(params_climate, params_anchor, nbRuns):
         mi_runs[r, :] = np.mean(mi, axis=1)
         coefRaw_runs[r, :] = coefRaw
         y_test_pred_runs[r].append(y_test_pred)
-        
+
         for i in range(len(dict_models["testFiles"])):
             if dict_models["testFiles"][i].split("_")[3] == "piControl":
-                testStatistic_null.append(np.corrcoef(np.transpose(y_test_pred[i * nbYears: (i+1) * nbYears]), 
-                                np.transpose(yf.values.reshape(-1,1)))[0, 1])
+                testStatistic_null.append(
+                    np.corrcoef(
+                        np.transpose(
+                            y_test_pred[i * nbYears : (i + 1) * nbYears]
+                        ),
+                        np.transpose(yf.values.reshape(-1, 1)),
+                    )[0, 1]
+                )
             elif dict_models["testFiles"][i].split("_")[3] != "piControl":
-                testStatistic_alt.append(np.corrcoef(np.transpose(y_test_pred[i * nbYears: (i+1) * nbYears]), 
-                                np.transpose(yf.values.reshape(-1,1)))[0, 1])
-        
+                testStatistic_alt.append(
+                    np.corrcoef(
+                        np.transpose(
+                            y_test_pred[i * nbYears : (i + 1) * nbYears]
+                        ),
+                        np.transpose(yf.values.reshape(-1, 1)),
+                    )[0, 1]
+                )
+
     mse_runs_df = pd.DataFrame(mse_runs)
     mse_runs_df["Lambda selected"] = pd.DataFrame(lambdaSel_runs)
     mse_runs_df.index.name = "Run"
@@ -700,11 +725,22 @@ def subagging(params_climate, params_anchor, nbRuns):
     if not os.path.isdir(dirname):
         os.makedirs(dirname)
     with open(filename, "wb") as f:
-        pickle.dump([lambdaSel_runs, coefRaw_runs, mse_runs_df, corr_pearson_runs, mi_runs, y_test_pred_runs,
-                     testStatistic_null, testStatistic_alt], f)
+        pickle.dump(
+            [
+                lambdaSel_runs,
+                coefRaw_runs,
+                mse_runs_df,
+                corr_pearson_runs,
+                mi_runs,
+                y_test_pred_runs,
+                testStatistic_null,
+                testStatistic_alt,
+            ],
+            f,
+        )
 
 
-def param_optimization(params_climate, params_anchor):
+def param_optimization(params_climate, params_anchor, cv_vals):
 
     print("Param optimization")
     target = params_climate["target"]
@@ -712,7 +748,6 @@ def param_optimization(params_climate, params_anchor):
     gamma_vals = params_anchor["gamma"]
     h_anchors = params_anchor["h_anchors"]
 
-    cv_vals = 50
     mse_gamma = np.zeros([len(gamma_vals), len(h_anchors) + 1, cv_vals])
     corr_gamma = np.zeros([len(gamma_vals), len(h_anchors) + 1, cv_vals])
     mi_gamma = np.zeros([len(gamma_vals), len(h_anchors) + 1, cv_vals])
@@ -808,6 +843,192 @@ def param_optimization(params_climate, params_anchor):
             ],
             f,
         )
+
+
+def cross_validation_gamma_lambda(
+    modelsDataList,
+    modelsInfoFrame,
+    dict_models,
+    params_climate,
+    gamma_vals,
+    h_anchors,
+    nb_lambda_vals,
+    display_CV_plot=False,
+):
+
+    uniqueTrain = set(
+        [
+            dict_models["trainFiles"][i].split("_")[2][:3]
+            for i in range(len(dict_models["trainFiles"]))
+        ]
+    )
+
+    """ Leave-one-model-out CV """
+    dict_folds = split_folds_CV(
+        modelsDataList,
+        modelsInfoFrame,
+        dict_models,
+        params_climate["target"],
+        params_climate["anchor"],
+        nbFoldsCV=len(uniqueTrain),
+        displayModels=False,
+    )
+
+    lambda_vals = np.logspace(-2, 6, nb_lambda_vals)
+    nb_folds_CV = len(dict_folds["foldsData"])
+    grid = (72, 144)
+    p = grid[0] * grid[1]
+
+    mse_bag_folds = np.zeros([nb_folds_CV, len(gamma_vals), nb_lambda_vals])
+    corr_bag_folds = np.zeros([nb_folds_CV, len(gamma_vals), nb_lambda_vals])
+    mi_bag_folds = np.zeros([nb_folds_CV, len(gamma_vals), nb_lambda_vals])
+    coef_raw_bag_folds = np.zeros(
+        [nb_folds_CV, len(gamma_vals), nb_lambda_vals, p]
+    )
+
+    for k in range(nb_folds_CV):
+        print(" === Fold " + str(k) + " ===", flush=True)
+        X_val_df = dict_folds["foldsData"][k]
+        y_val_df = dict_folds["foldsTarget"][k]
+        y_anchor_val_df = dict_folds["foldsAnchor"][k]
+
+        X_train_CV_df = pd.DataFrame()
+        y_train_CV_df = pd.DataFrame()
+        y_anchor_train_CV_df = pd.DataFrame()
+
+        for m in range(nb_folds_CV):
+            if m != k:
+                X_train_CV_df = pd.concat(
+                    [X_train_CV_df, dict_folds["foldsData"][m]], axis=0
+                )
+                y_train_CV_df = pd.concat(
+                    [y_train_CV_df, dict_folds["foldsTarget"][m]], axis=0
+                )
+                y_anchor_train_CV_df = pd.concat(
+                    [y_anchor_train_CV_df, dict_folds["foldsAnchor"][m]],
+                    axis=0,
+                )
+
+        dict_models_CV = {
+            "X_train": X_train_CV_df,
+            "y_train": y_train_CV_df,
+            "y_anchor_train": y_anchor_train_CV_df,
+            "X_test": X_val_df,  # need to call it test
+            "y_test": y_val_df,  # to be able to use standardize
+            "y_anchor_test": y_anchor_val_df,
+        }
+
+        (
+            X,
+            y,
+            y_anchor,
+            X_val,
+            y_val_true,
+            y_anchor_val,
+            std_X_train,
+        ) = standardize(dict_models_CV)
+
+        for i in range(len(gamma_vals)):
+
+            X_PA, y_PA = transformed_anchor_matrices(
+                X, y, y_anchor, gamma_vals[i], h_anchors
+            )
+
+            for j in range(len(lambda_vals)):
+                regr = linear_model.Ridge(
+                    alpha=X.shape[0] * lambda_vals[j] / 2
+                )
+                regr.fit(X_PA, y_PA)
+                y_val_pred = regr.predict(X_val)
+                residuals = (y_val_true - y_val_pred).reshape(-1)
+
+                coef_std = regr.coef_
+                coef_raw_bag_folds[k, i, j, :] = coef_std / np.array(
+                    std_X_train
+                ).reshape(1, p)
+
+                mse_bag_folds[k, i, j] = np.mean(
+                    (y_val_true - y_val_pred) ** 2
+                )
+                corr_bag_folds[k, i, j] = np.round(
+                    np.corrcoef(
+                        np.transpose(y_anchor_val), np.transpose(residuals)
+                    )[0, 1],
+                    2,
+                )
+                mi_bag_folds[k, i, j] = np.round(
+                    mutual_info_regression(y_anchor_val, residuals)[0], 2
+                )
+
+    mse_bag_av = np.mean(mse_bag_folds, axis=0)
+    corr_bag_av = np.mean(corr_bag_folds, axis=0)
+    mi_bag_av = np.mean(mi_bag_folds, axis=0)
+    coef_raw_bag_av = np.mean(coef_raw_bag_folds, axis=0)
+
+    """ Parameter optimization with Pareto"""
+    ind_opt_gamma, ind_opt_lambda = choose_gamma_lambda_pareto(
+        mse_bag_av,
+        corr_bag_av,
+        maxX=False,
+        maxY=False,
+    )
+
+    gamma_opt = gamma_vals[ind_opt_gamma]
+    lambda_opt = lambda_vals[ind_opt_lambda]
+    coef_raw_opt = coef_raw_bag_av[ind_opt_gamma, ind_opt_lambda, :]
+
+    return (
+        mse_bag_av,
+        corr_bag_av,
+        mi_bag_av,
+        coef_raw_opt,
+        gamma_opt,
+        lambda_opt,
+    )
+
+
+def choose_gamma_lambda_pareto(
+    Xs, Ys, maxX=True, maxY=True, plot=False, objective1=None, objective2=None
+):
+    """Pareto frontier selection process"""
+    Xs = np.abs(Xs)
+    Xsv = Xs.reshape(-1, 1)
+    Ys = np.abs(Ys)
+    Ysv = Ys.reshape(-1, 1)
+    sorted_list = sorted(
+        [[Xsv[i], Ysv[i]] for i in range(len(Xsv))], reverse=maxY
+    )
+    pareto_front = [sorted_list[0]]
+    for pair in sorted_list[1:]:
+        if maxY:
+            if pair[1] >= pareto_front[-1][1]:
+                pareto_front.append(pair)
+        else:
+            if pair[1] <= pareto_front[-1][1]:
+                pareto_front.append(pair)
+
+    ideal = [min(Xsv), min(Ysv)]
+    pf_X = [pair[0] for pair in pareto_front]
+    pf_Y = [pair[1] for pair in pareto_front]
+    dst = compute_distance(ideal, pf_X, pf_Y)
+    ind = np.argmin(dst)
+
+    """Plotting process"""
+    if plot:
+        plt.scatter(Xsv, Ysv)
+        plt.plot(pf_X, pf_Y)
+        plt.xlabel(objective1)
+        plt.ylabel(objective2)
+        plt.plot(ideal[0], ideal[1], "k*")
+        plt.plot(pf_X[ind], pf_Y[ind], "ro")
+        plt.show()
+
+    for ind_opt_gamma in range(Xs.shape[0]):  # nb gamma values
+        for ind_opt_lambda in range(Xs.shape[1]):  # nb lambda values
+            if (Xs[ind_opt_gamma, ind_opt_lambda] == pf_X[ind]) and (
+                Ys[ind_opt_gamma, ind_opt_lambda] == pf_Y[ind]
+            ):
+                return ind_opt_gamma, ind_opt_lambda
 
 
 def choose_gamma_h_lambda_pareto(

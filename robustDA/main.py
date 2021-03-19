@@ -45,8 +45,8 @@ def parser_args(input_params):
     for arg, val in input_params.items():
         parser.add_argument(
             "-%s" % arg,
-            type = type(val),
-            default = val,
+            type=type(val),
+            default=val,
         )
 
     args = parser.parse_args()

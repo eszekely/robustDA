@@ -25,5 +25,5 @@ endDate: 2014
 target: aerosols
 anchor: co2
 
-gamma: [1000] # list of gamma values
+gamma: [1, 10, 100, 1000] # list of gamma values
 nonlinear_anchors: [] # list of nonlinear anchors
