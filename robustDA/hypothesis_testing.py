@@ -5,6 +5,7 @@ import sys
 from tqdm import tqdm
 
 from copy import deepcopy
+from sklearn.preprocessing import StandardScaler
 
 from robustDA.process_cmip6 import read_files_cmip6, read_forcing_cmip6
 from robustDA.processing import split_train_test
@@ -20,18 +21,23 @@ def test_DA(params_climate, params_anchor):
     gamma_vals = params_anchor["gamma"]
     h_anchors = params_anchor["h_anchors"]
 
-    B = 3
-    cv_vals = 30
+    B = 1
+    cv_vals = 10
     grid = (72, 144)
     p = grid[0] * grid[1]
+    lambda_vals = np.logspace(-2, 5, cv_vals)
 
-    mse = np.zeros([B, len(gamma_vals), cv_vals])
+    rmse = np.zeros([B, len(gamma_vals), cv_vals])
     corr = np.zeros([B, len(gamma_vals), cv_vals])
     mi = np.zeros([B, len(gamma_vals), cv_vals])
     coef_raw_opt = np.zeros([B, p])
     y_test_true = [[] for i in range(B)]
     y_test_pred = [[] for i in range(B)]
     y_anchor_test = [[] for i in range(B)]
+    ind_gamma_opt = np.zeros([B, 1])
+    ind_lambda_opt = np.zeros([B, 1])
+    ind_vect_ideal_obj1 = np.zeros([B, 2])
+    ind_vect_ideal_obj2 = np.zeros([B, 2])
     gamma_opt = np.zeros([B, 1])
     lambda_opt = np.zeros([B, 1])
 
@@ -46,7 +52,12 @@ def test_DA(params_climate, params_anchor):
     power_bagging = np.zeros(len(models))
     nb_models_bagging = np.zeros(len(models))
 
-    filename = "HT_" + target + "_" + anchor
+    if len(h_anchors) == 0:
+        filename = "HT_" + target + "_" + anchor + "_K_3"
+    else:
+        filename = (
+            "HT_" + target + "_" + anchor + "_" + "-".join(h_anchors) + "_K_3"
+        )
 
     sys.stdout = open("./../output/logFiles/" + filename + ".log", "w")
 
@@ -61,12 +72,14 @@ def test_DA(params_climate, params_anchor):
         )
 
         (
-            mse_bag,
+            rmse_bag,
             corr_bag,
             mi_bag,
             coef_raw_bag_opt,
-            gamma_bag_opt,
-            lambda_bag_opt,
+            ind_gamma_bag_opt,
+            ind_lambda_bag_opt,
+            ind_vect_ideal_obj1_bag,
+            ind_vect_ideal_obj2_bag,
         ) = cross_validation_gamma_lambda(
             modelsDataList,
             modelsInfoFrame,
@@ -74,25 +87,32 @@ def test_DA(params_climate, params_anchor):
             params_climate,
             gamma_vals,
             h_anchors,
-            cv_vals,
+            lambda_vals,
             display_CV_plot=True,
         )
 
+        # Standardized values for the target (true and pred)
         y_test_pred_bag = np.array(
             np.matmul(dict_models["X_test"], coef_raw_bag_opt)
         )
 
-        mse[b, :, :] = mse_bag
+        y_test_true_bag = StandardScaler().fit_transform(dict_models["y_test"])
+
+        rmse[b, :, :] = rmse_bag
         corr[b, :, :] = corr_bag
         mi[b, :, :] = mi_bag
         coef_raw_opt[b, :] = coef_raw_bag_opt
-        y_test_true[b].append(dict_models["y_test"].values.reshape(-1))
+        y_test_true[b].append(y_test_true_bag)
         y_test_pred[b].append(y_test_pred_bag)
         y_anchor_test[b].append(
             dict_models["y_anchor_test"].values.reshape(-1)
         )
-        gamma_opt[b] = gamma_bag_opt
-        lambda_opt[b] = lambda_bag_opt
+        ind_gamma_opt[b] = ind_gamma_bag_opt
+        ind_lambda_opt[b] = ind_lambda_bag_opt
+        gamma_opt[b] = gamma_vals[ind_gamma_bag_opt]
+        lambda_opt[b] = lambda_vals[ind_lambda_bag_opt]
+        ind_vect_ideal_obj1[b] = ind_vect_ideal_obj1_bag
+        ind_vect_ideal_obj2[b] = ind_vect_ideal_obj2_bag
 
         alpha_per_bag, power_per_bag, nb_models_per_bag = test_DA_per_bag(
             params_climate, models, dict_models, y_test_pred_bag
@@ -126,13 +146,20 @@ def test_DA(params_climate, params_anchor):
     with open(dirname + filename + ".pkl", "wb") as f:
         pickle.dump(
             [
+                h_anchors,
+                gamma_vals,
+                lambda_vals,
+                ind_gamma_opt,
+                ind_lambda_opt,
                 gamma_opt,
                 lambda_opt,
+                ind_vect_ideal_obj1,
+                ind_vect_ideal_obj2,
                 coef_raw_opt,
                 y_test_true,
                 y_test_pred,
                 y_anchor_test,
-                mse,
+                rmse,
                 corr,
                 mi,
                 alpha_bagging,

@@ -18,7 +18,7 @@ from robustDA.plots import (
     make_plots,
     plot_CV_sem,
     plot_CV_multipleMSE,
-    plot_CV_pareto,
+    plot_Pareto,
 )
 from robustDA.utils import helpers
 
@@ -151,15 +151,15 @@ def anchor_regression_estimator(
 
         y_test_pred = np.array(np.matmul(Xt, coefStd.T))
 
-    y_test_pred = (
-        StandardScaler()
-        .fit(dict_models["y_test"])
-        .inverse_transform(y_test_pred)
-    )
+    #     y_test_pred = (
+    #         StandardScaler()
+    #         .fit(dict_models["y_test"])
+    #         .inverse_transform(y_test_pred)
+    #     )
 
     mse = np.mean((yt - y_test_pred) ** 2)
 
-    return coefRaw, y_test_pred, mse
+    return coefRaw, yt, y_test_pred, mse
 
 
 def run_anchor_regression_all(
@@ -484,7 +484,7 @@ def cross_validation_anchor_regression(
                 dict_folds["trainFolds"],
             )
         elif sel_method == "pareto":
-            plot_CV_pareto(
+            plot_Pareto(
                 mse_df,
                 lambdaSel,
                 filename,
@@ -492,15 +492,6 @@ def cross_validation_anchor_regression(
             )
 
     return lambdaSel, mse_df, corr_pearson, mi, lambdasCV
-
-
-def compute_distance(ideal, pf_X, pf_Y):
-    d = np.zeros([len(pf_X), 1])
-    for i in range(len(pf_X)):
-        d[i] = np.sqrt(
-            0.5 * (ideal[0] - pf_X[i]) ** 2 + 0.5 * (ideal[1] - pf_Y[i]) ** 2
-        )
-    return d
 
 
 def choose_lambda_pareto(
@@ -852,38 +843,37 @@ def cross_validation_gamma_lambda(
     params_climate,
     gamma_vals,
     h_anchors,
-    nb_lambda_vals,
+    lambda_vals,
     display_CV_plot=False,
 ):
 
-    uniqueTrain = set(
-        [
-            dict_models["trainFiles"][i].split("_")[2][:3]
-            for i in range(len(dict_models["trainFiles"]))
-        ]
-    )
+    """ LOOCV """
+    #     uniqueTrain = set(
+    #         [
+    #             dict_models["trainFiles"][i].split("_")[2][:3]
+    #             for i in range(len(dict_models["trainFiles"]))
+    #         ]
+    #     )
 
-    """ Leave-one-model-out CV """
     dict_folds = split_folds_CV(
         modelsDataList,
         modelsInfoFrame,
         dict_models,
         params_climate["target"],
         params_climate["anchor"],
-        nbFoldsCV=len(uniqueTrain),
+        nbFoldsCV=3,  # len(uniqueTrain),
         displayModels=False,
     )
 
-    lambda_vals = np.logspace(-2, 6, nb_lambda_vals)
     nb_folds_CV = len(dict_folds["foldsData"])
     grid = (72, 144)
     p = grid[0] * grid[1]
 
-    mse_bag_folds = np.zeros([nb_folds_CV, len(gamma_vals), nb_lambda_vals])
-    corr_bag_folds = np.zeros([nb_folds_CV, len(gamma_vals), nb_lambda_vals])
-    mi_bag_folds = np.zeros([nb_folds_CV, len(gamma_vals), nb_lambda_vals])
+    rmse_bag_folds = np.zeros([nb_folds_CV, len(gamma_vals), len(lambda_vals)])
+    corr_bag_folds = np.zeros([nb_folds_CV, len(gamma_vals), len(lambda_vals)])
+    mi_bag_folds = np.zeros([nb_folds_CV, len(gamma_vals), len(lambda_vals)])
     coef_raw_bag_folds = np.zeros(
-        [nb_folds_CV, len(gamma_vals), nb_lambda_vals, p]
+        [nb_folds_CV, len(gamma_vals), len(lambda_vals), p]
     )
 
     for k in range(nb_folds_CV):
@@ -947,8 +937,8 @@ def cross_validation_gamma_lambda(
                     std_X_train
                 ).reshape(1, p)
 
-                mse_bag_folds[k, i, j] = np.mean(
-                    (y_val_true - y_val_pred) ** 2
+                rmse_bag_folds[k, i, j] = np.sqrt(
+                    np.mean((y_val_true - y_val_pred) ** 2)
                 )
                 corr_bag_folds[k, i, j] = np.round(
                     np.corrcoef(
@@ -960,41 +950,74 @@ def cross_validation_gamma_lambda(
                     mutual_info_regression(y_anchor_val, residuals)[0], 2
                 )
 
-    mse_bag_av = np.mean(mse_bag_folds, axis=0)
+    rmse_bag_av = np.mean(rmse_bag_folds, axis=0)
     corr_bag_av = np.mean(corr_bag_folds, axis=0)
     mi_bag_av = np.mean(mi_bag_folds, axis=0)
     coef_raw_bag_av = np.mean(coef_raw_bag_folds, axis=0)
 
     """ Parameter optimization with Pareto"""
-    ind_opt_gamma, ind_opt_lambda = choose_gamma_lambda_pareto(
-        mse_bag_av,
-        corr_bag_av,
-        maxX=False,
-        maxY=False,
-    )
+    if len(h_anchors) == 0:
+        (
+            ind_gamma_opt,
+            ind_lambda_opt,
+            ind_vect_ideal_obj1,
+            ind_vect_ideal_obj2,
+        ) = choose_gamma_lambda_pareto(
+            rmse_bag_av,
+            corr_bag_av,
+            maxX=False,
+            maxY=False,
+        )
+    else:
+        (
+            ind_gamma_opt,
+            ind_lambda_opt,
+            ind_vect_ideal_obj1,
+            ind_vect_ideal_obj2,
+        ) = choose_gamma_lambda_pareto(
+            rmse_bag_av,
+            mi_bag_av,
+            maxX=False,
+            maxY=False,
+        )
 
-    gamma_opt = gamma_vals[ind_opt_gamma]
-    lambda_opt = lambda_vals[ind_opt_lambda]
-    coef_raw_opt = coef_raw_bag_av[ind_opt_gamma, ind_opt_lambda, :]
+    coef_raw_opt = coef_raw_bag_av[ind_gamma_opt, ind_lambda_opt, :]
 
     return (
-        mse_bag_av,
+        rmse_bag_av,
         corr_bag_av,
         mi_bag_av,
         coef_raw_opt,
-        gamma_opt,
-        lambda_opt,
+        ind_gamma_opt,
+        ind_lambda_opt,
+        ind_vect_ideal_obj1,
+        ind_vect_ideal_obj2,
     )
+
+
+def compute_distance(vect_ideal, vect_Nadir, pf_X, pf_Y):
+    d = np.zeros([len(pf_X), 1])
+    for i in range(len(pf_X)):
+        d[i] = np.sqrt(
+            0.5
+            * ((pf_X[i] - vect_ideal[0]) / (vect_Nadir[0] - vect_ideal[0]))
+            ** 2
+            + 0.5
+            * ((pf_Y[i] - vect_ideal[1]) / (vect_Nadir[1] - vect_ideal[1]))
+            ** 2
+        )
+
+    return d
 
 
 def choose_gamma_lambda_pareto(
     Xs, Ys, maxX=True, maxY=True, plot=False, objective1=None, objective2=None
 ):
     """Pareto frontier selection process"""
-    Xs = np.abs(Xs)
-    Xsv = Xs.reshape(-1, 1)
-    Ys = np.abs(Ys)
-    Ysv = Ys.reshape(-1, 1)
+    Xsa = np.abs(Xs)
+    Xsv = Xsa.reshape(-1, 1)
+    Ysa = np.abs(Ys)
+    Ysv = Ysa.reshape(-1, 1)
     sorted_list = sorted(
         [[Xsv[i], Ysv[i]] for i in range(len(Xsv))], reverse=maxY
     )
@@ -1007,28 +1030,56 @@ def choose_gamma_lambda_pareto(
             if pair[1] <= pareto_front[-1][1]:
                 pareto_front.append(pair)
 
-    ideal = [min(Xsv), min(Ysv)]
     pf_X = [pair[0] for pair in pareto_front]
     pf_Y = [pair[1] for pair in pareto_front]
-    dst = compute_distance(ideal, pf_X, pf_Y)
+
+    vect_ideal_abs = np.zeros(2)
+    vect_Nadir_abs = np.zeros(2)
+
+    min_obj1 = min(Xsv)
+    max_obj1 = max(Xsv)
+    min_obj2 = min(Ysv)
+    max_obj2 = max(Ysv)
+
+    for i in range(Xs.shape[0]):  # nb gamma values
+        for j in range(Xs.shape[1]):  # nb lambda values
+            if Xsa[i, j] == min_obj1:
+                ind_vect_ideal_obj1 = np.array([i, j])
+                vect_ideal_abs[0] = Xsa[i, j]
+            if Xsa[i, j] == max_obj1:
+                #                 ind_vect_Nadir_obj1 = np.array([i, j])
+                vect_Nadir_abs[0] = Xsa[i, j]
+            if Ysa[i, j] == min_obj2:
+                ind_vect_ideal_obj2 = np.array([i, j])
+                vect_ideal_abs[1] = Ysa[i, j]
+            if Ysa[i, j] == max_obj2:
+                #                 ind_vect_Nadir_obj2 = np.array([i, j])
+                vect_Nadir_abs[1] = Ysa[i, j]
+
+    dst = compute_distance(vect_ideal_abs, vect_Nadir_abs, pf_X, pf_Y)
     ind = np.argmin(dst)
 
-    """Plotting process"""
-    if plot:
-        plt.scatter(Xsv, Ysv)
-        plt.plot(pf_X, pf_Y)
-        plt.xlabel(objective1)
-        plt.ylabel(objective2)
-        plt.plot(ideal[0], ideal[1], "k*")
-        plt.plot(pf_X[ind], pf_Y[ind], "ro")
-        plt.show()
+    #     """Plotting process"""
+    #     if plot:
+    #         plt.scatter(Xsv, Ysv)
+    #         plt.plot(pf_X, pf_Y)
+    #         plt.xlabel(objective1)
+    #         plt.ylabel(objective2)
+    #         plt.plot(ideal[0], ideal[1], "k*")
+    #         plt.plot(pf_X[ind], pf_Y[ind], "ro")
+    #         plt.show()
 
     for ind_opt_gamma in range(Xs.shape[0]):  # nb gamma values
         for ind_opt_lambda in range(Xs.shape[1]):  # nb lambda values
-            if (Xs[ind_opt_gamma, ind_opt_lambda] == pf_X[ind]) and (
-                Ys[ind_opt_gamma, ind_opt_lambda] == pf_Y[ind]
+            if (Xsa[ind_opt_gamma, ind_opt_lambda] == pf_X[ind]) and (
+                Ysa[ind_opt_gamma, ind_opt_lambda] == pf_Y[ind]
             ):
-                return ind_opt_gamma, ind_opt_lambda
+                return (
+                    ind_opt_gamma,
+                    ind_opt_lambda,
+                    ind_vect_ideal_obj1,
+                    ind_vect_ideal_obj2,
+                )
 
 
 def choose_gamma_h_lambda_pareto(

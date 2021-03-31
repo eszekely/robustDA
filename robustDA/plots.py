@@ -11,6 +11,8 @@ from matplotlib import gridspec
 
 from robustDA.utils.helpers import truncate, display_nonlinear_anchors
 
+# from robustDA.anchor_regression import choose_gamma_lambda_pareto
+
 params = {
     "text.usetex": True,
     "text.latex.preamble": r"\usepackage{amsmath}",
@@ -100,6 +102,7 @@ def plotMapCartopy_subplots(fig, ax, dataMap, cLim=None, title_subplot=None):
 def make_plots(
     dict_models,
     coefRaw,
+    y_test_true,
     y_test_pred,
     A,
     gamma,
@@ -109,7 +112,7 @@ def make_plots(
     filename=None,
 ):
 
-    y_test_true = dict_models["y_test"].values
+    #     y_test_true = dict_models["y_test"].values
 
     # Standardize ?
     y_anchor_test = dict_models["y_anchor_test"]
@@ -229,7 +232,7 @@ def make_plots(
             + str(mi),
         )
 
-    plt.subplots_adjust(wspace=0.2)
+    plt.subplots_adjust(wspace=0.25)
 
     if filename is not None:
         fig.savefig(
@@ -376,6 +379,8 @@ def make_plots_HT(
             bbox_inches="tight",
         )
 
+    plt.subplots_adjust(wspace=0.25)
+
 
 #     plt.close()
 
@@ -488,7 +493,7 @@ def plot_CV_sem(mse_df, lambdasSelAll, sem_CV, filename, folds):
     plt.close()
 
 
-def plot_CV_pareto(mse_df, lambdasSelAll, filename, folds):
+def plot_CV_pareto_MSE(mse_df, lambdasSelAll, filename, folds):
     nbStd = np.array([5, 10])
     clr = ["r", "b"]
 
@@ -535,63 +540,118 @@ def plot_CV_pareto(mse_df, lambdasSelAll, filename, folds):
     plt.close()
 
 
-def plot_Pareto_fronts(
-    mse, corr, mi, gamma_vals, lambda_vals, ind_opt_gamma, ind_opt_lambda
+def plot_Pareto(
+    rmse,
+    corr,
+    mi,
+    h_anchors,
+    gamma_vals,
+    lambda_vals,
+    ind_opt_gamma,
+    ind_opt_lambda,
+    ind_vect_ideal_obj1,
+    ind_vect_ideal_obj2,
+    filename=None,
 ):
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(20, 5.4))
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 5.2))
 
-    for i in range(mse.shape[0]):
-        ax1.plot(
-            mse[i, :],
+    #     _, _, vect_ideal, vect_Nadir = choose_gamma_lambda_pareto(
+    #         rmse, mi, maxX=False, maxY=False,)
+
+    for i in range(rmse.shape[0]):
+        (line,) = ax1.plot(
+            rmse[i, :],
             corr[i, :],
             ".-",
             label="$\\gamma = $ " + str(gamma_vals[i]),
+        )
+        ax1.plot(
+            rmse[i, 0],
+            corr[i, 0],
+            color=line.get_color(),
+            marker="o",
         )
     ax1.plot(
-        mse[ind_opt_gamma, ind_opt_lambda],
+        rmse[ind_opt_gamma, ind_opt_lambda],
         corr[ind_opt_gamma, ind_opt_lambda],
-        "rs",
+        "ks",
     )
-    ax1.set_xscale("log")
-    ax1.set_xlabel("Mean squared error (MSE)", fontsize=14)
-    ax1.set_ylabel(
-        "Correlation of residuals with the anchor ($\\rho$)", fontsize=14
-    )
+    #     ax1.set_xscale("log")
+    ax1.set_xlabel("Root mean squared error (RMSE)", fontsize=17)
+    ax1.set_ylabel("Correlation of residuals and anchor", fontsize=17)
+    ax1.legend(fontsize=14)
 
-    for i in range(mse.shape[0]):
-        ax2.plot(
-            mse[i, :],
+    for i in range(rmse.shape[0]):
+        (line,) = ax2.plot(
+            rmse[i, :],
             mi[i, :],
             ".-",
             label="$\\gamma = $ " + str(gamma_vals[i]),
+        )
+        ax2.plot(
+            rmse[i, 0],
+            mi[i, 0],
+            color=line.get_color(),
+            marker="o",
         )
     ax2.plot(
-        mse[ind_opt_gamma, ind_opt_lambda],
+        rmse[ind_opt_gamma, ind_opt_lambda],
         mi[ind_opt_gamma, ind_opt_lambda],
-        "rs",
+        "ks",
     )
-    ax2.set_xscale("log")
-    ax2.set_xlabel("Mean squared error (MSE)", fontsize=14)
-    ax2.set_ylabel(
-        "Mutual information of residuals with the anchor ($I$)", fontsize=14
-    )
+    #     ax2.set_xscale("log")
+    ax2.set_xlabel("Root mean squared error (RMSE)", fontsize=17)
+    ax2.set_ylabel("Mutual information of residuals and anchor", fontsize=17)
 
-    for i in range(mse.shape[0]):
-        ax3.plot(
-            mi[i, :],
+    for i in range(rmse.shape[0]):
+        (line,) = ax3.plot(
             corr[i, :],
+            mi[i, :],
             ".-",
             label="$\\gamma = $ " + str(gamma_vals[i]),
         )
+        ax3.plot(
+            corr[i, 0],
+            mi[i, 0],
+            color=line.get_color(),
+            marker="o",
+        )
     ax3.plot(
-        mi[ind_opt_gamma, ind_opt_lambda],
         corr[ind_opt_gamma, ind_opt_lambda],
-        "rs",
+        mi[ind_opt_gamma, ind_opt_lambda],
+        "ks",
     )
-    ax3.set_xlabel(
-        "Mutual information of residuals with the anchor ($I$)", fontsize=14
-    )
-    ax3.set_ylabel(
-        "Correlation of residuals with the anchor ($\\rho$)", fontsize=14
-    )
-    ax3.legend(bbox_to_anchor=(1.03, 1.023), loc="upper left", fontsize=12)
+    ax3.set_xlabel("Correlation of residuals and anchor", fontsize=17)
+    ax3.set_ylabel("Mutual information of residuals and anchor", fontsize=17)
+
+    # plot ideal vector
+    if len(h_anchors) == 0:
+        ax1.plot(
+            rmse[
+                ind_vect_ideal_obj1[0].astype(int),
+                ind_vect_ideal_obj1[1].astype(int),
+            ],
+            corr[
+                ind_vect_ideal_obj2[0].astype(int),
+                ind_vect_ideal_obj2[1].astype(int),
+            ],
+            "ko",
+        )
+    else:
+        ax2.plot(
+            rmse[
+                ind_vect_ideal_obj1[0].astype(int),
+                ind_vect_ideal_obj1[1].astype(int),
+            ],
+            mi[
+                ind_vect_ideal_obj2[0].astype(int), ind_vect_ideal_obj2[1]
+            ].astype(int),
+            "ko",
+        )
+
+    plt.subplots_adjust(wspace=0.25)
+
+    if filename:
+        if not os.path.isdir("./../output/figures/"):
+            os.makedirs("./../output/figures/")
+        fig.savefig("./../output/figures/" + filename, bbox_inches="tight")
