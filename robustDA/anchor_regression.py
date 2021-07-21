@@ -24,34 +24,39 @@ from robustDA.utils import helpers
 
 
 def standardize(dict_models):
-    X_train = dict_models["X_train"].values
-    y_train = dict_models["y_train"].values
-    y_anchor_train = dict_models["y_anchor_train"].values
+    X_train_std = StandardScaler().fit_transform(dict_models["X_train"].values)
+    y_train_std = StandardScaler().fit_transform(dict_models["y_train"].values)
+    y_anchor_train_ctd = StandardScaler(
+        with_mean=True, with_std=False
+    ).fit_transform(dict_models["y_anchor_train"].values)
 
-    X_test = dict_models["X_test"].values
-    y_test = dict_models["y_test"].values
-    y_anchor_test = dict_models["y_anchor_test"].values
+    X_test_std = StandardScaler(with_mean=True, with_std=True).fit_transform(
+        dict_models["X_test"].values
+    )
+    y_test_std = StandardScaler(with_mean=True, with_std=True).fit_transform(
+        dict_models["y_test"].values
+    )
+    y_anchor_test_ctd = StandardScaler(
+        with_mean=True, with_std=False
+    ).fit_transform(dict_models["y_anchor_test"].values)
 
-    # Create a scaler object
-    sc_X = StandardScaler(with_mean=True, with_std=True)
-    sc_y = StandardScaler(with_mean=True, with_std=True)
-    sc_X_test = StandardScaler(with_mean=True, with_std=True)
-    sc_y_test = StandardScaler(with_mean=True, with_std=True)
+    std_X_train = dict_models["X_train"].values.std(axis=0)
+    std_y_train = dict_models["y_train"].values.std()
+    std_X_test = dict_models["X_test"].values.std(axis=0)
+    std_y_test = dict_models["y_test"].values.std()
 
-    # Fit the scaler to the data and transform
-    X_train_std = sc_X.fit_transform(X_train)
-    y_train_std = sc_y.fit_transform(y_train)
-    X_test_std = sc_X_test.fit_transform(X_test)
-    y_test_std = sc_y_test.fit_transform(y_test)
-
-    X = X_train_std
-    y = y_train_std
-    X_test = X_test_std
-    y_test = y_test_std
-
-    std_X_train = X_train.std(axis=0)
-
-    return X, y, y_anchor_train, X_test, y_test, y_anchor_test, std_X_train
+    return (
+        X_train_std,
+        y_train_std,
+        y_anchor_train_ctd,
+        X_test_std,
+        y_test_std,
+        y_anchor_test_ctd,
+        std_X_train,
+        std_y_train,
+        std_X_test,
+        std_y_test,
+    )
 
 
 def build_column_space(y_anchor, h_anchors):
@@ -73,13 +78,15 @@ def build_column_space(y_anchor, h_anchors):
             ).reshape(-1)
 
     A_h = np.mat(A_h)  # needed for matrix multiplication
-    PA = A_h * np.linalg.inv(np.transpose(A_h) * A_h) * np.transpose(A_h)
-    #     A_h_std = np.mat(StandardScaler().fit_transform(A_h))
-    #     PA = (
-    #         A_h_std
-    #         * np.linalg.inv(np.transpose(A_h_std) * A_h_std)
-    #         * np.transpose(A_h_std)
-    #     )
+    #     PA = A_h * np.linalg.inv(np.transpose(A_h) * A_h) * np.transpose(A_h)
+    A_h = np.mat(
+        StandardScaler(with_mean=True, with_std=False).fit_transform(A_h)
+    )
+    PA = (
+        A_h
+        * np.linalg.inv(np.transpose(A_h) * A_h)
+        * np.transpose(A_h)
+    )
 
     return PA
 
@@ -112,7 +119,9 @@ def anchor_regression_estimator(
     dict_models, gamma, h_anchors, regLambda, method="ridge", pred="original"
 ):
     """ Standardize the data before anchor regression """
-    X, y, y_anchor, Xt, yt, yt_anchor, std_X_train = standardize(dict_models)
+    X, y, y_anchor, Xt, yt, yt_anchor, std_X_train, std_y_train = standardize(
+        dict_models
+    )
 
     """ Use either the ridge implementation or direct implementation.
     Ridge is usually faster and used by default.
@@ -842,18 +851,21 @@ def cross_validation_gamma_lambda(
     dict_models,
     params_climate,
     gamma_vals,
+    cv_vals,
     h_anchors,
-    lambda_vals,
     display_CV_plot=False,
 ):
 
+    nb_folds_CV = 3
+    lambda_vals = np.logspace(0, 9, cv_vals)
+    
     """ LOOCV """
-    #     uniqueTrain = set(
-    #         [
-    #             dict_models["trainFiles"][i].split("_")[2][:3]
-    #             for i in range(len(dict_models["trainFiles"]))
-    #         ]
-    #     )
+    uniqueTrain = set(
+        [
+            dict_models["trainFiles"][i].split("_")[2][:3]
+            for i in range(len(dict_models["trainFiles"]))
+        ]
+    )
 
     dict_folds = split_folds_CV(
         modelsDataList,
@@ -861,20 +873,40 @@ def cross_validation_gamma_lambda(
         dict_models,
         params_climate["target"],
         params_climate["anchor"],
-        nbFoldsCV=3,  # len(uniqueTrain),
+        nbFoldsCV=nb_folds_CV, # len(uniqueTrain),
         displayModels=False,
     )
 
-    nb_folds_CV = len(dict_folds["foldsData"])
     grid = (72, 144)
     p = grid[0] * grid[1]
 
-    rmse_bag_folds = np.zeros([nb_folds_CV, len(gamma_vals), len(lambda_vals)])
-    corr_bag_folds = np.zeros([nb_folds_CV, len(gamma_vals), len(lambda_vals)])
-    mi_bag_folds = np.zeros([nb_folds_CV, len(gamma_vals), len(lambda_vals)])
-    coef_raw_bag_folds = np.zeros(
+    rmse_bag_folds_lin = np.zeros([nb_folds_CV, len(gamma_vals), len(lambda_vals)])
+    corr_bag_folds_lin = np.zeros([nb_folds_CV, len(gamma_vals), len(lambda_vals)])
+    mi_bag_folds_lin = np.zeros([nb_folds_CV, len(gamma_vals), len(lambda_vals)])
+    coef_std_bag_folds_lin = np.zeros(
         [nb_folds_CV, len(gamma_vals), len(lambda_vals), p]
     )
+    coef_raw_bag_folds_lin = np.zeros(
+        [nb_folds_CV, len(gamma_vals), len(lambda_vals), p]
+    )
+    rmse_test_lin = np.zeros([len(gamma_vals), len(lambda_vals)])
+    corr_test_lin = np.zeros([len(gamma_vals), len(lambda_vals)])
+    mi_test_lin = np.zeros([len(gamma_vals), len(lambda_vals)])
+    
+    rmse_bag_folds_nonlin = np.zeros([nb_folds_CV, len(gamma_vals), len(lambda_vals)])
+    corr_bag_folds_nonlin = np.zeros([nb_folds_CV, len(gamma_vals), len(lambda_vals)])
+    corr2_bag_folds_nonlin = np.zeros([nb_folds_CV, len(gamma_vals), len(lambda_vals)])
+    mi_bag_folds_nonlin = np.zeros([nb_folds_CV, len(gamma_vals), len(lambda_vals)])
+    coef_std_bag_folds_nonlin = np.zeros(
+        [nb_folds_CV, len(gamma_vals), len(lambda_vals), p]
+    )
+    coef_raw_bag_folds_nonlin = np.zeros(
+        [nb_folds_CV, len(gamma_vals), len(lambda_vals), p]
+    )
+    rmse_test_nonlin = np.zeros([len(gamma_vals), len(lambda_vals)])
+    corr_test_nonlin = np.zeros([len(gamma_vals), len(lambda_vals)])
+    corr2_test_nonlin = np.zeros([len(gamma_vals), len(lambda_vals)])
+    mi_test_nonlin = np.zeros([len(gamma_vals), len(lambda_vals)])
 
     for k in range(nb_folds_CV):
         print(" === Fold " + str(k) + " ===", flush=True)
@@ -903,95 +935,338 @@ def cross_validation_gamma_lambda(
             "X_train": X_train_CV_df,
             "y_train": y_train_CV_df,
             "y_anchor_train": y_anchor_train_CV_df,
-            "X_test": X_val_df,  # need to call it test
-            "y_test": y_val_df,  # to be able to use standardize
-            "y_anchor_test": y_anchor_val_df,
+            "X_val": X_val_df,  # need to call it 'X_test' and 'y_test'
+            "y_val": y_val_df,  # to be able to use the 'standardize' method
+            "y_anchor_val": y_anchor_val_df,
         }
 
-        (
-            X,
-            y,
-            y_anchor,
-            X_val,
-            y_val_true,
-            y_anchor_val,
-            std_X_train,
-        ) = standardize(dict_models_CV)
+        #         (
+        #             X,
+        #             y,
+        #             y_anchor,
+        #             X_val,
+        #             y_val_true,
+        #             y_anchor_val,
+        #             std_X_train,
+        #             std_y_train,
+        #         ) = standardize(dict_models_CV)
+
+        X_train_std = StandardScaler().fit_transform(
+            dict_models_CV["X_train"].values
+        )
+        sc_y_train = StandardScaler()
+        y_train_std = sc_y_train.fit_transform(
+            dict_models_CV["y_train"].values
+        )
+        y_anchor_train_ctd = StandardScaler(
+            with_mean=True, with_std=False
+        ).fit_transform(dict_models_CV["y_anchor_train"].values)
+
+        sc_X_val = StandardScaler(with_mean=True, with_std=True)
+        X_val_std = sc_X_val.fit_transform(dict_models_CV["X_val"].values)
+
+        y_val = dict_models_CV["y_val"].values
+
+        std_X_train = dict_models_CV["X_train"].values.std(axis=0)
+        std_y_train = dict_models_CV["y_train"].values.std()
 
         for i in range(len(gamma_vals)):
 
+            ''' Linear anchor '''
             X_PA, y_PA = transformed_anchor_matrices(
-                X, y, y_anchor, gamma_vals[i], h_anchors
+                X_train_std,
+                y_train_std,
+                y_anchor_train_ctd,
+                gamma_vals[i],
+                None,
             )
 
             for j in range(len(lambda_vals)):
-                regr = linear_model.Ridge(
-                    alpha=X.shape[0] * lambda_vals[j] / 2
-                )
+                regr = linear_model.Ridge(alpha=lambda_vals[j])
                 regr.fit(X_PA, y_PA)
-                y_val_pred = regr.predict(X_val)
-                residuals = (y_val_true - y_val_pred).reshape(-1)
 
                 coef_std = regr.coef_
-                coef_raw_bag_folds[k, i, j, :] = coef_std / np.array(
-                    std_X_train
-                ).reshape(1, p)
-
-                rmse_bag_folds[k, i, j] = np.sqrt(
-                    np.mean((y_val_true - y_val_pred) ** 2)
+                coef_raw = (
+                    coef_std
+                    * std_y_train
+                    / np.array(std_X_train).reshape(1, p)
                 )
-                corr_bag_folds[k, i, j] = np.round(
+
+                y_val_pred_std = regr.predict(X_val_std)
+                y_val_pred = sc_y_train.inverse_transform(y_val_pred_std)
+
+                residuals = (y_val - y_val_pred).reshape(-1)
+
+                coef_std_bag_folds_lin[k, i, j, :] = coef_std
+                coef_raw_bag_folds_lin[k, i, j, :] = coef_raw
+
+                rmse_bag_folds_lin[k, i, j] = np.sqrt(np.mean(residuals ** 2))
+
+                corr_bag_folds_lin[k, i, j] = np.round(
                     np.corrcoef(
-                        np.transpose(y_anchor_val), np.transpose(residuals)
+                        np.transpose(dict_models_CV["y_anchor_val"].values),
+                        np.transpose(residuals),
                     )[0, 1],
                     2,
                 )
-                mi_bag_folds[k, i, j] = np.round(
-                    mutual_info_regression(y_anchor_val, residuals)[0], 2
+                
+                mi_bag_folds_lin[k, i, j] = np.round(
+                    mutual_info_regression(
+                        dict_models_CV["y_anchor_val"].values, residuals
+                    )[0],
+                    2,
+                )
+                
+            ''' Nonlinear anchor '''
+            X_PA, y_PA = transformed_anchor_matrices(
+                X_train_std,
+                y_train_std,
+                y_anchor_train_ctd,
+                gamma_vals[i],
+                h_anchors,
+            )
+
+            for j in range(len(lambda_vals)):
+                regr = linear_model.Ridge(alpha=lambda_vals[j])
+                regr.fit(X_PA, y_PA)
+
+                coef_std = regr.coef_
+                coef_raw = (
+                    coef_std
+                    * std_y_train
+                    / np.array(std_X_train).reshape(1, p)
                 )
 
-    rmse_bag_av = np.mean(rmse_bag_folds, axis=0)
-    corr_bag_av = np.mean(corr_bag_folds, axis=0)
-    mi_bag_av = np.mean(mi_bag_folds, axis=0)
-    coef_raw_bag_av = np.mean(coef_raw_bag_folds, axis=0)
+                y_val_pred_std = regr.predict(X_val_std)
+                y_val_pred = sc_y_train.inverse_transform(y_val_pred_std)
 
-    """ Parameter optimization with Pareto"""
-    if len(h_anchors) == 0:
-        (
-            ind_gamma_opt,
-            ind_lambda_opt,
-            ind_vect_ideal_obj1,
-            ind_vect_ideal_obj2,
-        ) = choose_gamma_lambda_pareto(
-            rmse_bag_av,
-            corr_bag_av,
-            maxX=False,
-            maxY=False,
-        )
-    else:
-        (
-            ind_gamma_opt,
-            ind_lambda_opt,
-            ind_vect_ideal_obj1,
-            ind_vect_ideal_obj2,
-        ) = choose_gamma_lambda_pareto(
-            rmse_bag_av,
-            mi_bag_av,
-            maxX=False,
-            maxY=False,
-        )
+                residuals = (y_val - y_val_pred).reshape(-1)
 
-    coef_raw_opt = coef_raw_bag_av[ind_gamma_opt, ind_lambda_opt, :]
+                coef_std_bag_folds_nonlin[k, i, j, :] = coef_std
+                coef_raw_bag_folds_nonlin[k, i, j, :] = coef_raw
 
+                rmse_bag_folds_nonlin[k, i, j] = np.sqrt(np.mean(residuals ** 2))
+
+                corr_bag_folds_nonlin[k, i, j] = np.round(
+                    np.corrcoef(
+                        np.transpose(dict_models_CV["y_anchor_val"].values),
+                        np.transpose(residuals),
+                    )[0, 1],
+                    2,
+                )
+                
+                corr2_bag_folds_nonlin[k, i, j] = np.round(
+                    np.corrcoef(
+                        np.transpose(dict_models_CV["y_anchor_val"].values ** 2),
+                        np.transpose(residuals),
+                    )[0, 1],
+                    2,
+                )
+                    
+                mi_bag_folds_nonlin[k, i, j] = np.round(
+                    mutual_info_regression(
+                        dict_models_CV["y_anchor_val"].values, residuals
+                    )[0],
+                    2,
+                )
+                
+    rmse_bag_av_lin = np.mean(rmse_bag_folds_lin, axis=0)
+    corr_bag_av_lin = np.mean(corr_bag_folds_lin, axis=0)
+    mi_bag_av_lin = np.mean(mi_bag_folds_lin, axis=0)
+
+    rmse_bag_av_nonlin = np.mean(rmse_bag_folds_nonlin, axis=0)
+    corr_bag_av_nonlin = np.mean(corr_bag_folds_nonlin, axis=0)
+    corr2_bag_av_nonlin = np.mean(corr2_bag_folds_nonlin, axis=0)
+    mi_bag_av_nonlin = np.mean(mi_bag_folds_nonlin, axis=0)
+
+    coef_std_bag_av_lin = np.mean(coef_std_bag_folds_lin, axis=0)
+    coef_raw_bag_av_lin = np.mean(coef_raw_bag_folds_lin, axis=0)
+    
+    coef_std_bag_av_nonlin = np.mean(coef_std_bag_folds_nonlin, axis=0)
+    coef_raw_bag_av_nonlin = np.mean(coef_raw_bag_folds_nonlin, axis=0)
+
+
+    """ Evaluation on the held-out test data for all parameter values"""
+    sc_y_train = StandardScaler(with_mean=True, with_std=True)
+    y_train_std = sc_y_train.fit_transform(dict_models["y_train"].values)
+
+    sc_X_test = StandardScaler(with_mean=True, with_std=True)
+    X_test_std = sc_X_test.fit_transform(dict_models["X_test"].values)
+
+    y_test = dict_models["y_test"].values
+    
+#     sc_y_test = StandardScaler(with_mean=True, with_std=True)
+#     y_test_std = sc_y_test.fit_transform(dict_models["y_test"].values)
+
+
+    for i in range(len(gamma_vals)):
+        ''' Linear anchor '''
+        for j in range(len(lambda_vals)):
+            coef_std = coef_std_bag_av_lin[i, j, :].reshape(1, -1)
+            y_test_pred_std = np.array(
+                np.matmul(X_test_std, np.transpose(coef_std))
+            )
+
+            y_test_pred = sc_y_train.inverse_transform(y_test_pred_std)
+            residuals = (y_test - y_test_pred).reshape(-1)
+
+            rmse_test_lin[i, j] = np.sqrt(np.mean(residuals ** 2))
+
+            corr_test_lin[i, j] = np.round(
+                np.corrcoef(
+                    np.transpose(dict_models["y_anchor_test"].values),
+                    np.transpose(residuals),
+                )[0, 1],
+                2,
+            )
+
+            mi_test_lin[i, j] = np.round(
+                mutual_info_regression(
+                    dict_models["y_anchor_test"].values, residuals
+                )[0],
+                2,
+            )
+        
+        ''' Nonlinear anchor '''
+        for j in range(len(lambda_vals)):
+            coef_std = coef_std_bag_av_nonlin[i, j, :].reshape(1, -1)
+            y_test_pred_std = np.array(
+                np.matmul(X_test_std, np.transpose(coef_std))
+            )
+
+            y_test_pred = sc_y_train.inverse_transform(y_test_pred_std)
+            residuals = (y_test - y_test_pred).reshape(-1)
+
+            rmse_test_nonlin[i, j] = np.sqrt(np.mean(residuals ** 2))
+
+            corr_test_nonlin[i, j] = np.round(
+                np.corrcoef(
+                    np.transpose(dict_models["y_anchor_test"].values),
+                    np.transpose(residuals),
+                )[0, 1],
+                2,
+            )
+
+            corr2_test_nonlin[i, j] = np.round(
+                np.corrcoef(
+                    np.transpose(dict_models["y_anchor_test"].values ** 2),
+                    np.transpose(residuals),
+                )[0, 1],
+                2,
+            )
+            
+            mi_test_nonlin[i, j] = np.round(
+                mutual_info_regression(
+                    dict_models["y_anchor_test"].values, residuals
+                )[0],
+                2,
+            )
+
+
+    """ Parameter optimization with Pareto for anchor regression """
+#     if len(h_anchors) == 0:
+    (
+        ind_gamma_opt_lin,
+        ind_lambda_opt_lin,
+        ind_vect_ideal_obj1_lin,
+        ind_vect_ideal_obj2_lin,
+    ) = choose_gamma_lambda_pareto(
+        rmse_bag_av_lin,
+        corr_bag_av_lin,
+        maxX=False,
+        maxY=False,
+    )
+#     else:
+    (
+        ind_gamma_opt_nonlin,
+        ind_lambda_opt_nonlin,
+        ind_vect_ideal_obj1_nonlin,
+        ind_vect_ideal_obj2_nonlin,
+        ind_vect_ideal_obj3_nonlin,
+    ) = choose_gamma_lambda_pareto_3(
+        rmse_bag_av_nonlin,
+        corr_bag_av_nonlin,
+        corr2_bag_av_nonlin,
+        maxX=False,
+        maxY=False,
+        maxZ=False,
+    )
+
+    coef_raw_opt_lin = coef_raw_bag_av_lin[ind_gamma_opt_lin, ind_lambda_opt_lin, :]
+    coef_std_opt_lin = coef_std_bag_av_lin[ind_gamma_opt_lin, ind_lambda_opt_lin, :]
+
+    coef_raw_opt_nonlin = coef_raw_bag_av_nonlin[ind_gamma_opt_nonlin, ind_lambda_opt_nonlin, :]
+    coef_std_opt_nonlin = coef_std_bag_av_nonlin[ind_gamma_opt_nonlin, ind_lambda_opt_nonlin, :]
+
+    """ Parameter optimization with Pareto for ridge regression """
+#     if len(h_anchors) == 0:
+    (
+        _,
+        ind_lambda_opt_ridge_lin,
+        _,
+        _,
+    ) = choose_gamma_lambda_pareto(
+        rmse_bag_av_lin[0,:].reshape(1, -1),
+        corr_bag_av_lin[0,:].reshape(1, -1),
+        maxX=False,
+        maxY=False,
+    )
+#     else:
+    (
+        _,
+        ind_lambda_opt_ridge_nonlin,
+        _,
+        _,
+        _,
+    ) = choose_gamma_lambda_pareto_3(
+        rmse_bag_av_nonlin[0,:].reshape(1, -1),
+        corr_bag_av_nonlin[0,:].reshape(1, -1),
+        corr2_bag_av_nonlin[0,:].reshape(1, -1),
+        maxX=False,
+        maxY=False,
+        maxZ=False,
+    )
+
+    coef_raw_opt_ridge_lin = coef_raw_bag_av_lin[0, ind_lambda_opt_ridge_lin, :]
+    coef_std_opt_ridge_lin = coef_std_bag_av_lin[0, ind_lambda_opt_ridge_lin, :]
+    
+    coef_raw_opt_ridge_nonlin = coef_raw_bag_av_nonlin[0, ind_lambda_opt_ridge_nonlin, :]
+    coef_std_opt_ridge_nonlin = coef_std_bag_av_nonlin[0, ind_lambda_opt_ridge_nonlin, :]
+    
     return (
-        rmse_bag_av,
-        corr_bag_av,
-        mi_bag_av,
-        coef_raw_opt,
-        ind_gamma_opt,
-        ind_lambda_opt,
-        ind_vect_ideal_obj1,
-        ind_vect_ideal_obj2,
+        rmse_bag_av_lin,
+        corr_bag_av_lin,
+        mi_bag_av_lin,
+        coef_raw_opt_lin,
+        coef_std_opt_lin,
+        coef_raw_opt_ridge_lin,
+        coef_std_opt_ridge_lin,
+        rmse_test_lin,
+        corr_test_lin,
+        mi_test_lin,
+        ind_gamma_opt_lin,
+        ind_lambda_opt_lin,
+        ind_lambda_opt_ridge_lin,
+        ind_vect_ideal_obj1_lin,
+        ind_vect_ideal_obj2_lin,
+        rmse_bag_av_nonlin,
+        corr_bag_av_nonlin,
+        corr2_bag_av_nonlin,
+        mi_bag_av_nonlin,
+        coef_raw_opt_nonlin,
+        coef_std_opt_nonlin,
+        coef_raw_opt_ridge_nonlin,
+        coef_std_opt_ridge_nonlin,
+        rmse_test_nonlin,
+        corr_test_nonlin,
+        corr2_test_nonlin,
+        mi_test_nonlin,
+        ind_gamma_opt_nonlin,
+        ind_lambda_opt_nonlin,
+        ind_lambda_opt_ridge_nonlin,
+        ind_vect_ideal_obj1_nonlin,
+        ind_vect_ideal_obj2_nonlin,
+        ind_vect_ideal_obj3_nonlin,
     )
 
 
@@ -1004,6 +1279,24 @@ def compute_distance(vect_ideal, vect_Nadir, pf_X, pf_Y):
             ** 2
             + 0.5
             * ((pf_Y[i] - vect_ideal[1]) / (vect_Nadir[1] - vect_ideal[1]))
+            ** 2
+        )
+
+    return d
+
+
+def compute_distance_3(vect_ideal, vect_Nadir, pf_X, pf_Y, pf_Z):
+    d = np.zeros([len(pf_X), 1])
+    for i in range(len(pf_X)):
+        d[i] = np.sqrt(
+            0.5
+            * ((pf_X[i] - vect_ideal[0]) / (vect_Nadir[0] - vect_ideal[0]))
+            ** 2
+            + 0.25
+            * ((pf_Y[i] - vect_ideal[1]) / (vect_Nadir[1] - vect_ideal[1]))
+            ** 2
+            + 0.25
+            * ((pf_Z[i] - vect_ideal[2]) / (vect_Nadir[2] - vect_ideal[2]))
             ** 2
         )
 
@@ -1079,6 +1372,92 @@ def choose_gamma_lambda_pareto(
                     ind_opt_lambda,
                     ind_vect_ideal_obj1,
                     ind_vect_ideal_obj2,
+                )
+
+            
+def choose_gamma_lambda_pareto_3(
+    Xs, Ys, Zs, maxX=True, maxY=True, maxZ=True, plot=False, objective1=None, objective2=None, objective3=None
+):
+    """Pareto frontier selection process"""
+    Xsa = np.abs(Xs)
+    Xsv = Xsa.reshape(-1, 1)
+    Ysa = np.abs(Ys)
+    Ysv = Ysa.reshape(-1, 1)
+    Zsa = np.abs(Zs)
+    Zsv = Zsa.reshape(-1, 1)
+    
+    sorted_list = sorted(
+        [[Xsv[i], Ysv[i], Zsv[i]] for i in range(len(Xsv))], reverse=maxY
+    )
+    pareto_front = [sorted_list[0]]
+    for pair in sorted_list[1:]:
+        if maxY:
+            if pair[1] >= pareto_front[-1][1]:
+                pareto_front.append(pair)
+        else:
+            if pair[1] <= pareto_front[-1][1]:
+                pareto_front.append(pair)
+
+    pf_X = [pair[0] for pair in pareto_front]
+    pf_Y = [pair[1] for pair in pareto_front]
+    pf_Z = [pair[2] for pair in pareto_front]
+
+    vect_ideal_abs = np.zeros(3)
+    vect_Nadir_abs = np.zeros(3)
+
+    min_obj1 = min(Xsv)
+    max_obj1 = max(Xsv)
+    min_obj2 = min(Ysv)
+    max_obj2 = max(Ysv)
+    min_obj3 = min(Zsv)
+    max_obj3 = max(Zsv)
+
+    for i in range(Xs.shape[0]):  # nb gamma values
+        for j in range(Xs.shape[1]):  # nb lambda values
+            if Xsa[i, j] == min_obj1:
+                ind_vect_ideal_obj1 = np.array([i, j])
+                vect_ideal_abs[0] = Xsa[i, j]
+            if Xsa[i, j] == max_obj1:
+                #                 ind_vect_Nadir_obj1 = np.array([i, j])
+                vect_Nadir_abs[0] = Xsa[i, j]
+            if Ysa[i, j] == min_obj2:
+                ind_vect_ideal_obj2 = np.array([i, j])
+                vect_ideal_abs[1] = Ysa[i, j]
+            if Ysa[i, j] == max_obj2:
+                #                 ind_vect_Nadir_obj2 = np.array([i, j])
+                vect_Nadir_abs[1] = Ysa[i, j]
+            if Zsa[i, j] == min_obj3:
+                ind_vect_ideal_obj3 = np.array([i, j])
+                vect_ideal_abs[2] = Zsa[i, j]
+            if Zsa[i, j] == max_obj3:
+                #                 ind_vect_Nadir_obj2 = np.array([i, j])
+                vect_Nadir_abs[2] = Zsa[i, j]
+
+    dst = compute_distance_3(vect_ideal_abs, vect_Nadir_abs, pf_X, pf_Y, pf_Z)
+    ind = np.argmin(dst)
+
+    #     """Plotting process"""
+    #     if plot:
+    #         plt.scatter(Xsv, Ysv)
+    #         plt.plot(pf_X, pf_Y)
+    #         plt.xlabel(objective1)
+    #         plt.ylabel(objective2)
+    #         plt.plot(ideal[0], ideal[1], "k*")
+    #         plt.plot(pf_X[ind], pf_Y[ind], "ro")
+    #         plt.show()
+
+    for ind_opt_gamma in range(Xs.shape[0]):  # nb gamma values
+        for ind_opt_lambda in range(Xs.shape[1]):  # nb lambda values
+            if (Xsa[ind_opt_gamma, ind_opt_lambda] == pf_X[ind]) and (
+                Ysa[ind_opt_gamma, ind_opt_lambda] == pf_Y[ind]) and (
+                Zsa[ind_opt_gamma, ind_opt_lambda] == pf_Z[ind]
+            ):
+                return (
+                    ind_opt_gamma,
+                    ind_opt_lambda,
+                    ind_vect_ideal_obj1,
+                    ind_vect_ideal_obj2,
+                    ind_vect_ideal_obj3,
                 )
 
 

@@ -113,7 +113,7 @@ def read_files_cmip6(params_climate, norm=True):
                                 )
                                 temp_ncdata_df = pd.DataFrame(
                                     temp_ncdata[
-                                        : endDate - startDate + 1,
+                                        -(endDate - startDate + 1) :,
                                     ],
                                     index=dates,
                                 )
