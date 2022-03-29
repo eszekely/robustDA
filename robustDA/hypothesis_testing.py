@@ -5,7 +5,8 @@ import sys
 from tqdm import tqdm
 
 from copy import deepcopy
-from sklearn.preprocessing import StandardScaler
+# from sklearn.preprocessing import StandardScaler
+from scipy.stats import spearmanr
 
 from robustDA.process_cmip6 import read_files_cmip6, read_forcing_cmip6
 from robustDA.processing import split_train_test
@@ -50,7 +51,7 @@ def test_DA(params_climate, params_anchor):
     gamma_opt_lin = np.zeros([B, 1])
     lambda_opt_lin = np.zeros([B, 1])
     lambda_opt_ridge_lin = np.zeros([B, 1])
-    
+
     rmse_train_nonlin = np.zeros([B, len(gamma_vals), cv_vals])
     corr_train_nonlin = np.zeros([B, len(gamma_vals), cv_vals])
     corr2_train_nonlin = np.zeros([B, len(gamma_vals), cv_vals])
@@ -86,7 +87,7 @@ def test_DA(params_climate, params_anchor):
     alpha_bagging_lin = np.zeros(len(models))
     power_bagging_lin = np.zeros(len(models))
     nb_models_bagging = np.zeros(len(models))
-    
+
     alpha_bagging_nonlin = np.zeros(len(models))
     power_bagging_nonlin = np.zeros(len(models))
 
@@ -101,7 +102,9 @@ def test_DA(params_climate, params_anchor):
             + "_"
             + "-".join(h_anchors)
             + "_B"
-            + str(B) + "_CV3"
+            + str(B)
+            + "_CV3"
+            + "_spearman95_coefRaw"
         )
 
     sys.stdout = open("./../output/logFiles/" + filename + ".log", "w")
@@ -156,35 +159,48 @@ def test_DA(params_climate, params_anchor):
             deepcopy(dict_models),
             params_climate,
             gamma_vals,
-            cv_vals,
+            lambda_vals,
             h_anchors,
             display_CV_plot=True,
         )
 
-        sc_y_train = StandardScaler(with_mean=True, with_std=True)
-        y_train_std = sc_y_train.fit_transform(dict_models["y_train"].values)
-    
-        sc_X_test = StandardScaler(with_mean=True, with_std=True)
-        X_test_std = sc_X_test.fit_transform(dict_models["X_test"].values)
+        #         sc_y_train = StandardScaler(with_mean=True, with_std=True)
+        #         y_train_std = sc_y_train.fit_transform(dict_models["y_train"].values)
+
+        #         sc_X_test = StandardScaler(with_mean=True, with_std=True)
+        #         X_test_std = sc_X_test.fit_transform(dict_models["X_test"].values)
 
         y_test_true_bag = dict_models["y_test"].values
-        
+
         y_test_true[b].append(y_test_true_bag)
         y_anchor_test[b].append(
             dict_models["y_anchor_test"].values
         )  # do not change the anchor
-        
 
-        ''' Linear anchor '''
-        y_test_pred_std = np.array(
-            np.matmul(X_test_std, np.transpose(coef_std_bag_opt_lin))
+        """ Linear anchor """
+        #         y_test_pred_std = np.array(
+        #             np.matmul(X_test_std, np.transpose(coef_std_bag_opt_lin))
+        #         )
+        #         y_test_pred_bag = sc_y_train.inverse_transform(y_test_pred_std)
+
+        y_test_pred_bag = np.array(
+            np.matmul(
+                dict_models["X_test"].values,
+                np.transpose(coef_raw_bag_opt_lin),
+            )
         )
-        y_test_pred_bag = sc_y_train.inverse_transform(y_test_pred_std)
-        
-        y_test_pred_std_ridge = np.array(
-            np.matmul(X_test_std, np.transpose(coef_std_bag_opt_ridge_lin))
+
+        #         y_test_pred_std_ridge = np.array(
+        #             np.matmul(X_test_std, np.transpose(coef_std_bag_opt_ridge_lin))
+        #         )
+        #         y_test_pred_bag_ridge = sc_y_train.inverse_transform(y_test_pred_std_ridge)
+
+        y_test_pred_bag_ridge = np.array(
+            np.matmul(
+                dict_models["X_test"].values,
+                np.transpose(coef_raw_bag_opt_ridge_lin),
+            )
         )
-        y_test_pred_bag_ridge = sc_y_train.inverse_transform(y_test_pred_std_ridge)
 
         rmse_train_lin[b, :, :] = rmse_train_bag_lin
         corr_train_lin[b, :, :] = corr_train_bag_lin
@@ -196,38 +212,56 @@ def test_DA(params_climate, params_anchor):
 
         coef_raw_opt_lin[b, :] = coef_raw_bag_opt_lin
         coef_raw_opt_ridge_lin[b, :] = coef_raw_bag_opt_ridge_lin
-        
+
         y_test_pred_lin[b].append(y_test_pred_bag)
         y_test_pred_ridge_lin[b].append(y_test_pred_bag_ridge)
-        
+
         ind_gamma_opt_lin[b] = ind_gamma_bag_opt_lin
         ind_lambda_opt_lin[b] = ind_lambda_bag_opt_lin
         ind_lambda_opt_ridge_lin[b] = ind_lambda_bag_opt_ridge_lin
         gamma_opt_lin[b] = gamma_vals[ind_gamma_bag_opt_lin]
         lambda_opt_lin[b] = lambda_vals[ind_lambda_bag_opt_lin]
         lambda_opt_ridge_lin[b] = lambda_vals[ind_lambda_bag_opt_ridge_lin]
-        
+
         ind_vect_ideal_obj1_lin[b] = ind_vect_ideal_obj1_bag_lin
         ind_vect_ideal_obj2_lin[b] = ind_vect_ideal_obj2_bag_lin
 
-        alpha_per_bag_lin, power_per_bag_lin, nb_models_per_bag = test_DA_per_bag(
+        (
+            alpha_per_bag_lin,
+            power_per_bag_lin,
+            nb_models_per_bag,
+        ) = test_DA_per_bag(
             params_climate, models, dict_models, y_test_pred_bag
         )
 
         alpha_bagging_lin = alpha_bagging_lin + alpha_per_bag_lin
         power_bagging_lin = power_bagging_lin + power_per_bag_lin
         nb_models_bagging = nb_models_bagging + nb_models_per_bag
-        
-        ''' Nonlinear anchor '''
-        y_test_pred_std = np.array(
-            np.matmul(X_test_std, np.transpose(coef_std_bag_opt_nonlin))
+
+        """ Nonlinear anchor """
+        #         y_test_pred_std = np.array(
+        #             np.matmul(X_test_std, np.transpose(coef_std_bag_opt_nonlin))
+        #         )
+        #         y_test_pred_bag = sc_y_train.inverse_transform(y_test_pred_std)
+
+        y_test_pred_bag = np.array(
+            np.matmul(
+                dict_models["X_test"].values,
+                np.transpose(coef_raw_bag_opt_nonlin),
+            )
         )
-        y_test_pred_bag = sc_y_train.inverse_transform(y_test_pred_std)
-        
-        y_test_pred_std_ridge = np.array(
-            np.matmul(X_test_std, np.transpose(coef_std_bag_opt_ridge_nonlin))
+
+        #         y_test_pred_std_ridge = np.array(
+        #             np.matmul(X_test_std, np.transpose(coef_std_bag_opt_ridge_nonlin))
+        #         )
+        #         y_test_pred_bag_ridge = sc_y_train.inverse_transform(y_test_pred_std_ridge)
+
+        y_test_pred_bag_ridge = np.array(
+            np.matmul(
+                dict_models["X_test"].values,
+                np.transpose(coef_raw_bag_opt_ridge_nonlin),
+            )
         )
-        y_test_pred_bag_ridge = sc_y_train.inverse_transform(y_test_pred_std_ridge)
 
         rmse_train_nonlin[b, :, :] = rmse_train_bag_nonlin
         corr_train_nonlin[b, :, :] = corr_train_bag_nonlin
@@ -241,22 +275,28 @@ def test_DA(params_climate, params_anchor):
 
         coef_raw_opt_nonlin[b, :] = coef_raw_bag_opt_nonlin
         coef_raw_opt_ridge_nonlin[b, :] = coef_raw_bag_opt_ridge_nonlin
-        
+
         y_test_pred_nonlin[b].append(y_test_pred_bag)
         y_test_pred_ridge_nonlin[b].append(y_test_pred_bag_ridge)
-        
+
         ind_gamma_opt_nonlin[b] = ind_gamma_bag_opt_nonlin
         ind_lambda_opt_nonlin[b] = ind_lambda_bag_opt_nonlin
         ind_lambda_opt_ridge_nonlin[b] = ind_lambda_bag_opt_ridge_nonlin
         gamma_opt_nonlin[b] = gamma_vals[ind_gamma_bag_opt_nonlin]
         lambda_opt_nonlin[b] = lambda_vals[ind_lambda_bag_opt_nonlin]
-        lambda_opt_ridge_nonlin[b] = lambda_vals[ind_lambda_bag_opt_ridge_nonlin]
-        
+        lambda_opt_ridge_nonlin[b] = lambda_vals[
+            ind_lambda_bag_opt_ridge_nonlin
+        ]
+
         ind_vect_ideal_obj1_nonlin[b] = ind_vect_ideal_obj1_bag_nonlin
         ind_vect_ideal_obj2_nonlin[b] = ind_vect_ideal_obj2_bag_nonlin
         ind_vect_ideal_obj3_nonlin[b] = ind_vect_ideal_obj3_bag_nonlin
 
-        alpha_per_bag_nonlin, power_per_bag_nonlin, nb_models_per_bag = test_DA_per_bag(
+        (
+            alpha_per_bag_nonlin,
+            power_per_bag_nonlin,
+            nb_models_per_bag,
+        ) = test_DA_per_bag(
             params_climate, models, dict_models, y_test_pred_bag
         )
 
@@ -279,7 +319,7 @@ def test_DA(params_climate, params_anchor):
             for i in range(len(models))
         ]
     )
-    
+
     alpha_bagging_nonlin = np.array(
         [
             alpha_bagging_nonlin[i] / nb_models_bagging[i]
@@ -297,7 +337,6 @@ def test_DA(params_climate, params_anchor):
         ]
     )
 
-    
     dirname = "./../output/data/"
     if not os.path.isdir(dirname):
         os.makedirs(dirname)
@@ -393,12 +432,23 @@ def test_DA_per_bag(params_climate, models, dict_models, y_test_pred):
             test_model_ts_vals = []
 
             for j in range(len(dict_models["testFiles"])):
-                ts = np.corrcoef(
-                    np.transpose(
-                        y_test_pred[j * nb_years : (j + 1) * nb_years]
-                    ),
-                    np.transpose(yf.values.reshape(-1, 1)),
-                )[0, 1]
+                #                 ''' Linear correlation (Pearson) '''
+                #                 ts = np.corrcoef(
+                #                     np.transpose(
+                #                         y_test_pred[j * nb_years : (j + 1) * nb_years]
+                #                     ),
+                #                     np.transpose(yf.values.reshape(-1, 1)),
+                #                 )[0, 1]
+
+                """ Rank correlation (Spearman) """
+                ts = spearmanr(
+                    y_test_pred[j * nb_years : (j + 1) * nb_years], yf.values
+                ).correlation
+
+                #                 ''' First differences -- rank correlation '''
+                #                 diff_pred = np.diff(y_test_pred[j * nb_years : (j + 1) * nb_years])
+                #                 diff_true = yf.diff().values[1:]
+                #                 ts = spearmanr(diff_pred, diff_true).correlation
 
                 if dict_models["testFiles"][j].split("_")[2][:3] != models[i]:
                     if (
@@ -411,7 +461,9 @@ def test_DA_per_bag(params_climate, models, dict_models, y_test_pred):
                     test_model_ts_vals.append(ts)
 
             ts_null_mean = np.mean(ts_null)
-            ts_null_std = np.std(ts_null)
+            ts_null_std = np.std(
+                ts_null
+            )  # for one control run per model, otherwise also need to compute the variance
             print(
                 str(i)
                 + " --- "
@@ -430,7 +482,8 @@ def test_DA_per_bag(params_climate, models, dict_models, y_test_pred):
                 print(test_model_files[k])
                 if (
                     test_model_ts_vals[k]
-                    > ts_null_mean + 1.96 * ts_null_std  # 1.96 or 2.326
+                    > ts_null_mean
+                    + 1.96 * ts_null_std  # 1.96 (95%) or 2.326 (98%)
                     or test_model_ts_vals[k]
                     < ts_null_mean - 1.96 * ts_null_std
                 ):

@@ -82,11 +82,7 @@ def build_column_space(y_anchor, h_anchors):
     A_h = np.mat(
         StandardScaler(with_mean=True, with_std=False).fit_transform(A_h)
     )
-    PA = (
-        A_h
-        * np.linalg.inv(np.transpose(A_h) * A_h)
-        * np.transpose(A_h)
-    )
+    PA = A_h * np.linalg.inv(np.transpose(A_h) * A_h) * np.transpose(A_h)
 
     return PA
 
@@ -851,21 +847,20 @@ def cross_validation_gamma_lambda(
     dict_models,
     params_climate,
     gamma_vals,
-    cv_vals,
+    lambda_vals,
     h_anchors,
     display_CV_plot=False,
 ):
 
     nb_folds_CV = 3
-    lambda_vals = np.logspace(0, 9, cv_vals)
-    
+
     """ LOOCV """
-    uniqueTrain = set(
-        [
-            dict_models["trainFiles"][i].split("_")[2][:3]
-            for i in range(len(dict_models["trainFiles"]))
-        ]
-    )
+#     uniqueTrain = set(
+#         [
+#             dict_models["trainFiles"][i].split("_")[2][:3]
+#             for i in range(len(dict_models["trainFiles"]))
+#         ]
+#     )
 
     dict_folds = split_folds_CV(
         modelsDataList,
@@ -873,16 +868,22 @@ def cross_validation_gamma_lambda(
         dict_models,
         params_climate["target"],
         params_climate["anchor"],
-        nbFoldsCV=nb_folds_CV, # len(uniqueTrain),
+        nbFoldsCV=nb_folds_CV,  # len(uniqueTrain),
         displayModels=False,
     )
 
     grid = (72, 144)
     p = grid[0] * grid[1]
 
-    rmse_bag_folds_lin = np.zeros([nb_folds_CV, len(gamma_vals), len(lambda_vals)])
-    corr_bag_folds_lin = np.zeros([nb_folds_CV, len(gamma_vals), len(lambda_vals)])
-    mi_bag_folds_lin = np.zeros([nb_folds_CV, len(gamma_vals), len(lambda_vals)])
+    rmse_bag_folds_lin = np.zeros(
+        [nb_folds_CV, len(gamma_vals), len(lambda_vals)]
+    )
+    corr_bag_folds_lin = np.zeros(
+        [nb_folds_CV, len(gamma_vals), len(lambda_vals)]
+    )
+    mi_bag_folds_lin = np.zeros(
+        [nb_folds_CV, len(gamma_vals), len(lambda_vals)]
+    )
     coef_std_bag_folds_lin = np.zeros(
         [nb_folds_CV, len(gamma_vals), len(lambda_vals), p]
     )
@@ -892,11 +893,19 @@ def cross_validation_gamma_lambda(
     rmse_test_lin = np.zeros([len(gamma_vals), len(lambda_vals)])
     corr_test_lin = np.zeros([len(gamma_vals), len(lambda_vals)])
     mi_test_lin = np.zeros([len(gamma_vals), len(lambda_vals)])
-    
-    rmse_bag_folds_nonlin = np.zeros([nb_folds_CV, len(gamma_vals), len(lambda_vals)])
-    corr_bag_folds_nonlin = np.zeros([nb_folds_CV, len(gamma_vals), len(lambda_vals)])
-    corr2_bag_folds_nonlin = np.zeros([nb_folds_CV, len(gamma_vals), len(lambda_vals)])
-    mi_bag_folds_nonlin = np.zeros([nb_folds_CV, len(gamma_vals), len(lambda_vals)])
+
+    rmse_bag_folds_nonlin = np.zeros(
+        [nb_folds_CV, len(gamma_vals), len(lambda_vals)]
+    )
+    corr_bag_folds_nonlin = np.zeros(
+        [nb_folds_CV, len(gamma_vals), len(lambda_vals)]
+    )
+    corr2_bag_folds_nonlin = np.zeros(
+        [nb_folds_CV, len(gamma_vals), len(lambda_vals)]
+    )
+    mi_bag_folds_nonlin = np.zeros(
+        [nb_folds_CV, len(gamma_vals), len(lambda_vals)]
+    )
     coef_std_bag_folds_nonlin = np.zeros(
         [nb_folds_CV, len(gamma_vals), len(lambda_vals), p]
     )
@@ -935,8 +944,8 @@ def cross_validation_gamma_lambda(
             "X_train": X_train_CV_df,
             "y_train": y_train_CV_df,
             "y_anchor_train": y_anchor_train_CV_df,
-            "X_val": X_val_df,  # need to call it 'X_test' and 'y_test'
-            "y_val": y_val_df,  # to be able to use the 'standardize' method
+            "X_val": X_val_df,
+            "y_val": y_val_df,
             "y_anchor_val": y_anchor_val_df,
         }
 
@@ -958,12 +967,13 @@ def cross_validation_gamma_lambda(
         y_train_std = sc_y_train.fit_transform(
             dict_models_CV["y_train"].values
         )
+        # Only center the anchor, no need to standardize
         y_anchor_train_ctd = StandardScaler(
             with_mean=True, with_std=False
         ).fit_transform(dict_models_CV["y_anchor_train"].values)
 
-        sc_X_val = StandardScaler(with_mean=True, with_std=True)
-        X_val_std = sc_X_val.fit_transform(dict_models_CV["X_val"].values)
+#         sc_X_val = StandardScaler(with_mean=True, with_std=True)
+#         X_val_std = sc_X_val.fit_transform(dict_models_CV["X_val"].values)
 
         y_val = dict_models_CV["y_val"].values
 
@@ -972,7 +982,7 @@ def cross_validation_gamma_lambda(
 
         for i in range(len(gamma_vals)):
 
-            ''' Linear anchor '''
+            """ Linear anchor """
             X_PA, y_PA = transformed_anchor_matrices(
                 X_train_std,
                 y_train_std,
@@ -982,6 +992,7 @@ def cross_validation_gamma_lambda(
             )
 
             for j in range(len(lambda_vals)):
+                # No intercept needed, X and y are centered and so are X_PA and y_PA
                 regr = linear_model.Ridge(alpha=lambda_vals[j])
                 regr.fit(X_PA, y_PA)
 
@@ -992,8 +1003,19 @@ def cross_validation_gamma_lambda(
                     / np.array(std_X_train).reshape(1, p)
                 )
 
-                y_val_pred_std = regr.predict(X_val_std)
-                y_val_pred = sc_y_train.inverse_transform(y_val_pred_std)
+                #                 ''' Prediction using the standardized coefficients
+                #                 and rescale using the standard deviation of the
+                #                 training data '''
+                #                 y_val_pred_std = regr.predict(X_val_std)
+                #                 y_val_pred = sc_y_train.inverse_transform(y_val_pred_std)
+
+                """ Prediction on validation set
+                    using raw coefficients """
+                y_val_pred = np.array(
+                    np.matmul(
+                        dict_models_CV["X_val"].values, np.transpose(coef_raw)
+                    )
+                )
 
                 residuals = (y_val - y_val_pred).reshape(-1)
 
@@ -1009,15 +1031,15 @@ def cross_validation_gamma_lambda(
                     )[0, 1],
                     2,
                 )
-                
+
                 mi_bag_folds_lin[k, i, j] = np.round(
                     mutual_info_regression(
                         dict_models_CV["y_anchor_val"].values, residuals
                     )[0],
                     2,
                 )
-                
-            ''' Nonlinear anchor '''
+
+            """ Nonlinear anchor """
             X_PA, y_PA = transformed_anchor_matrices(
                 X_train_std,
                 y_train_std,
@@ -1037,15 +1059,28 @@ def cross_validation_gamma_lambda(
                     / np.array(std_X_train).reshape(1, p)
                 )
 
-                y_val_pred_std = regr.predict(X_val_std)
-                y_val_pred = sc_y_train.inverse_transform(y_val_pred_std)
+                #                 ''' Prediction using the standardized coefficients
+                #                 and rescale using the standard deviation of the
+                #                 training data '''
+                #                 y_val_pred_std = regr.predict(X_val_std)
+                #                 y_val_pred = sc_y_train.inverse_transform(y_val_pred_std)
+
+                """ Prediction on validation set
+                    using raw coefficients """
+                y_val_pred = np.array(
+                    np.matmul(
+                        dict_models_CV["X_val"].values, np.transpose(coef_raw)
+                    )
+                )
 
                 residuals = (y_val - y_val_pred).reshape(-1)
 
                 coef_std_bag_folds_nonlin[k, i, j, :] = coef_std
                 coef_raw_bag_folds_nonlin[k, i, j, :] = coef_raw
 
-                rmse_bag_folds_nonlin[k, i, j] = np.sqrt(np.mean(residuals ** 2))
+                rmse_bag_folds_nonlin[k, i, j] = np.sqrt(
+                    np.mean(residuals ** 2)
+                )
 
                 corr_bag_folds_nonlin[k, i, j] = np.round(
                     np.corrcoef(
@@ -1054,22 +1089,24 @@ def cross_validation_gamma_lambda(
                     )[0, 1],
                     2,
                 )
-                
+
                 corr2_bag_folds_nonlin[k, i, j] = np.round(
                     np.corrcoef(
-                        np.transpose(dict_models_CV["y_anchor_val"].values ** 2),
+                        np.transpose(
+                            dict_models_CV["y_anchor_val"].values ** 2
+                        ),
                         np.transpose(residuals),
                     )[0, 1],
                     2,
                 )
-                    
+
                 mi_bag_folds_nonlin[k, i, j] = np.round(
                     mutual_info_regression(
                         dict_models_CV["y_anchor_val"].values, residuals
                     )[0],
                     2,
                 )
-                
+
     rmse_bag_av_lin = np.mean(rmse_bag_folds_lin, axis=0)
     corr_bag_av_lin = np.mean(corr_bag_folds_lin, axis=0)
     mi_bag_av_lin = np.mean(mi_bag_folds_lin, axis=0)
@@ -1081,33 +1118,35 @@ def cross_validation_gamma_lambda(
 
     coef_std_bag_av_lin = np.mean(coef_std_bag_folds_lin, axis=0)
     coef_raw_bag_av_lin = np.mean(coef_raw_bag_folds_lin, axis=0)
-    
+
     coef_std_bag_av_nonlin = np.mean(coef_std_bag_folds_nonlin, axis=0)
     coef_raw_bag_av_nonlin = np.mean(coef_raw_bag_folds_nonlin, axis=0)
 
-
     """ Evaluation on the held-out test data for all parameter values"""
-    sc_y_train = StandardScaler(with_mean=True, with_std=True)
-    y_train_std = sc_y_train.fit_transform(dict_models["y_train"].values)
+    #     sc_y_train = StandardScaler(with_mean=True, with_std=True)
+    #     y_train_std = sc_y_train.fit_transform(dict_models["y_train"].values)
 
-    sc_X_test = StandardScaler(with_mean=True, with_std=True)
-    X_test_std = sc_X_test.fit_transform(dict_models["X_test"].values)
+    #     sc_X_test = StandardScaler(with_mean=True, with_std=True)
+    #     X_test_std = sc_X_test.fit_transform(dict_models["X_test"].values)
 
     y_test = dict_models["y_test"].values
-    
-#     sc_y_test = StandardScaler(with_mean=True, with_std=True)
-#     y_test_std = sc_y_test.fit_transform(dict_models["y_test"].values)
 
+    #     sc_y_test = StandardScaler(with_mean=True, with_std=True)
+    #     y_test_std = sc_y_test.fit_transform(dict_models["y_test"].values)
 
     for i in range(len(gamma_vals)):
-        ''' Linear anchor '''
+        """ Linear anchor """
         for j in range(len(lambda_vals)):
             coef_std = coef_std_bag_av_lin[i, j, :].reshape(1, -1)
-            y_test_pred_std = np.array(
-                np.matmul(X_test_std, np.transpose(coef_std))
-            )
+            coef_raw = coef_raw_bag_av_lin[i, j, :].reshape(1, -1)
+            #             y_test_pred_std = np.array(
+            #                 np.matmul(X_test_std, np.transpose(coef_std))
+            #             )
+            #             y_test_pred = sc_y_train.inverse_transform(y_test_pred_std)
 
-            y_test_pred = sc_y_train.inverse_transform(y_test_pred_std)
+            y_test_pred = np.array(
+                np.matmul(dict_models["X_test"].values, np.transpose(coef_raw))
+            )
             residuals = (y_test - y_test_pred).reshape(-1)
 
             rmse_test_lin[i, j] = np.sqrt(np.mean(residuals ** 2))
@@ -1126,15 +1165,20 @@ def cross_validation_gamma_lambda(
                 )[0],
                 2,
             )
-        
-        ''' Nonlinear anchor '''
+
+        """ Nonlinear anchor """
         for j in range(len(lambda_vals)):
             coef_std = coef_std_bag_av_nonlin[i, j, :].reshape(1, -1)
-            y_test_pred_std = np.array(
-                np.matmul(X_test_std, np.transpose(coef_std))
+            coef_raw = coef_raw_bag_av_nonlin[i, j, :].reshape(1, -1)
+            #             y_test_pred_std = np.array(
+            #                 np.matmul(X_test_std, np.transpose(coef_std))
+            #             )
+            #             y_test_pred = sc_y_train.inverse_transform(y_test_pred_std)
+
+            y_test_pred = np.array(
+                np.matmul(dict_models["X_test"].values, np.transpose(coef_raw))
             )
 
-            y_test_pred = sc_y_train.inverse_transform(y_test_pred_std)
             residuals = (y_test - y_test_pred).reshape(-1)
 
             rmse_test_nonlin[i, j] = np.sqrt(np.mean(residuals ** 2))
@@ -1154,7 +1198,7 @@ def cross_validation_gamma_lambda(
                 )[0, 1],
                 2,
             )
-            
+
             mi_test_nonlin[i, j] = np.round(
                 mutual_info_regression(
                     dict_models["y_anchor_test"].values, residuals
@@ -1162,9 +1206,8 @@ def cross_validation_gamma_lambda(
                 2,
             )
 
-
     """ Parameter optimization with Pareto for anchor regression """
-#     if len(h_anchors) == 0:
+    #     if len(h_anchors) == 0:
     (
         ind_gamma_opt_lin,
         ind_lambda_opt_lin,
@@ -1176,7 +1219,7 @@ def cross_validation_gamma_lambda(
         maxX=False,
         maxY=False,
     )
-#     else:
+    #     else:
     (
         ind_gamma_opt_nonlin,
         ind_lambda_opt_nonlin,
@@ -1192,47 +1235,52 @@ def cross_validation_gamma_lambda(
         maxZ=False,
     )
 
-    coef_raw_opt_lin = coef_raw_bag_av_lin[ind_gamma_opt_lin, ind_lambda_opt_lin, :]
-    coef_std_opt_lin = coef_std_bag_av_lin[ind_gamma_opt_lin, ind_lambda_opt_lin, :]
+    coef_raw_opt_lin = coef_raw_bag_av_lin[
+        ind_gamma_opt_lin, ind_lambda_opt_lin, :
+    ]
+    coef_std_opt_lin = coef_std_bag_av_lin[
+        ind_gamma_opt_lin, ind_lambda_opt_lin, :
+    ]
 
-    coef_raw_opt_nonlin = coef_raw_bag_av_nonlin[ind_gamma_opt_nonlin, ind_lambda_opt_nonlin, :]
-    coef_std_opt_nonlin = coef_std_bag_av_nonlin[ind_gamma_opt_nonlin, ind_lambda_opt_nonlin, :]
+    coef_raw_opt_nonlin = coef_raw_bag_av_nonlin[
+        ind_gamma_opt_nonlin, ind_lambda_opt_nonlin, :
+    ]
+    coef_std_opt_nonlin = coef_std_bag_av_nonlin[
+        ind_gamma_opt_nonlin, ind_lambda_opt_nonlin, :
+    ]
 
     """ Parameter optimization with Pareto for ridge regression """
-#     if len(h_anchors) == 0:
-    (
-        _,
-        ind_lambda_opt_ridge_lin,
-        _,
-        _,
-    ) = choose_gamma_lambda_pareto(
-        rmse_bag_av_lin[0,:].reshape(1, -1),
-        corr_bag_av_lin[0,:].reshape(1, -1),
+    #     if len(h_anchors) == 0:
+    (_, ind_lambda_opt_ridge_lin, _, _,) = choose_gamma_lambda_pareto(
+        rmse_bag_av_lin[0, :].reshape(1, -1),
+        corr_bag_av_lin[0, :].reshape(1, -1),
         maxX=False,
         maxY=False,
     )
-#     else:
-    (
-        _,
-        ind_lambda_opt_ridge_nonlin,
-        _,
-        _,
-        _,
-    ) = choose_gamma_lambda_pareto_3(
-        rmse_bag_av_nonlin[0,:].reshape(1, -1),
-        corr_bag_av_nonlin[0,:].reshape(1, -1),
-        corr2_bag_av_nonlin[0,:].reshape(1, -1),
+    #     else:
+    (_, ind_lambda_opt_ridge_nonlin, _, _, _,) = choose_gamma_lambda_pareto_3(
+        rmse_bag_av_nonlin[0, :].reshape(1, -1),
+        corr_bag_av_nonlin[0, :].reshape(1, -1),
+        corr2_bag_av_nonlin[0, :].reshape(1, -1),
         maxX=False,
         maxY=False,
         maxZ=False,
     )
 
-    coef_raw_opt_ridge_lin = coef_raw_bag_av_lin[0, ind_lambda_opt_ridge_lin, :]
-    coef_std_opt_ridge_lin = coef_std_bag_av_lin[0, ind_lambda_opt_ridge_lin, :]
-    
-    coef_raw_opt_ridge_nonlin = coef_raw_bag_av_nonlin[0, ind_lambda_opt_ridge_nonlin, :]
-    coef_std_opt_ridge_nonlin = coef_std_bag_av_nonlin[0, ind_lambda_opt_ridge_nonlin, :]
-    
+    coef_raw_opt_ridge_lin = coef_raw_bag_av_lin[
+        0, ind_lambda_opt_ridge_lin, :
+    ]
+    coef_std_opt_ridge_lin = coef_std_bag_av_lin[
+        0, ind_lambda_opt_ridge_lin, :
+    ]
+
+    coef_raw_opt_ridge_nonlin = coef_raw_bag_av_nonlin[
+        0, ind_lambda_opt_ridge_nonlin, :
+    ]
+    coef_std_opt_ridge_nonlin = coef_std_bag_av_nonlin[
+        0, ind_lambda_opt_ridge_nonlin, :
+    ]
+
     return (
         rmse_bag_av_lin,
         corr_bag_av_lin,
@@ -1374,9 +1422,18 @@ def choose_gamma_lambda_pareto(
                     ind_vect_ideal_obj2,
                 )
 
-            
+
 def choose_gamma_lambda_pareto_3(
-    Xs, Ys, Zs, maxX=True, maxY=True, maxZ=True, plot=False, objective1=None, objective2=None, objective3=None
+    Xs,
+    Ys,
+    Zs,
+    maxX=True,
+    maxY=True,
+    maxZ=True,
+    plot=False,
+    objective1=None,
+    objective2=None,
+    objective3=None,
 ):
     """Pareto frontier selection process"""
     Xsa = np.abs(Xs)
@@ -1385,7 +1442,7 @@ def choose_gamma_lambda_pareto_3(
     Ysv = Ysa.reshape(-1, 1)
     Zsa = np.abs(Zs)
     Zsv = Zsa.reshape(-1, 1)
-    
+
     sorted_list = sorted(
         [[Xsv[i], Ysv[i], Zsv[i]] for i in range(len(Xsv))], reverse=maxY
     )
@@ -1448,9 +1505,10 @@ def choose_gamma_lambda_pareto_3(
 
     for ind_opt_gamma in range(Xs.shape[0]):  # nb gamma values
         for ind_opt_lambda in range(Xs.shape[1]):  # nb lambda values
-            if (Xsa[ind_opt_gamma, ind_opt_lambda] == pf_X[ind]) and (
-                Ysa[ind_opt_gamma, ind_opt_lambda] == pf_Y[ind]) and (
-                Zsa[ind_opt_gamma, ind_opt_lambda] == pf_Z[ind]
+            if (
+                (Xsa[ind_opt_gamma, ind_opt_lambda] == pf_X[ind])
+                and (Ysa[ind_opt_gamma, ind_opt_lambda] == pf_Y[ind])
+                and (Zsa[ind_opt_gamma, ind_opt_lambda] == pf_Z[ind])
             ):
                 return (
                     ind_opt_gamma,

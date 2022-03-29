@@ -13,7 +13,7 @@ Parameters: >
     Start date for CMIP6: 1850
     Target: 1) forcing (from ERF files): total, total_anthropogenic, GHG, CO2,
                                          aerosols, total_natural, volcanic, solar
-            2) forced response (computed from the one forcing runs):
+            2) forced response (computed from the single forcing runs):
                                          hist-aer, hist-GHG, hist-nat
     =============================================================================
 
@@ -27,4 +27,5 @@ anchor: aerosols
 
 gamma: [1, 5, 10, 50, 100, 500, 1000, 5000, 10000] # list of gamma values
 # gamma: [1, 10, 100, 1000, 10000] # list of gamma values
+# gamma: [1, 100, 10000] # list of gamma values
 nonlinear_anchors: ['square'] # list of nonlinear anchors
