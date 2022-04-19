@@ -3,7 +3,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import pandas as pd
 import cartopy.crs as ccrs
+import matplotlib.transforms as mtransforms
 
 from pandas.core.common import flatten
 from sklearn.feature_selection import mutual_info_regression
@@ -872,7 +874,7 @@ def plot_all(
 
     grid = (72, 144)
 
-#     axis_labels = ["A", "B", "C", "D", "E", "F", "G"]
+    #     axis_labels = ["A", "B", "C", "D", "E", "F", "G"]
 
     rmse_bagging = np.mean(rmse, axis=0)
     corr_bagging = np.mean(corr, axis=0)
@@ -973,10 +975,10 @@ def plot_all(
     """ ############################ """
     yt = np.array(list(flatten(y_test_true))).reshape(-1, 1)
     yp = np.array(list(flatten(y_test_pred))).reshape(-1, 1)
-#     yp_ridge = np.array(list(flatten(y_test_pred_ridge))).reshape(-1, 1)
+    #     yp_ridge = np.array(list(flatten(y_test_pred_ridge))).reshape(-1, 1)
     ya = np.array(list(flatten(y_anchor_test))).reshape(-1, 1)
     residuals = (yt - yp).reshape(-1)
-#     residuals_ridge = (yt - yp_ridge).reshape(-1)
+    #     residuals_ridge = (yt - yp_ridge).reshape(-1)
 
     fig = plt.figure(figsize=(18, 15))
     spec = gridspec.GridSpec(nrows=7, ncols=10)
@@ -1440,10 +1442,10 @@ def plot_all_v2(
     """ ############################ """
     yt = np.array(list(flatten(y_test_true))).reshape(-1, 1)
     yp = np.array(list(flatten(y_test_pred))).reshape(-1, 1)
-#     yp_ridge = np.array(list(flatten(y_test_pred_ridge))).reshape(-1, 1)
+    #     yp_ridge = np.array(list(flatten(y_test_pred_ridge))).reshape(-1, 1)
     ya = np.array(list(flatten(y_anchor_test))).reshape(-1, 1)
     residuals = (yt - yp).reshape(-1)
-#     residuals_ridge = (yt - yp_ridge).reshape(-1)
+    #     residuals_ridge = (yt - yp_ridge).reshape(-1)
 
     fig = plt.figure(figsize=(15, 20))
     spec = gridspec.GridSpec(nrows=10, ncols=10)
@@ -1998,3 +2000,623 @@ def label_panel(
         -offset_left, offset_up, fig.dpi_scale_trans
     )
     ax.text(0, 1, prefix + letter + postfix, transform=trans, **kwds)
+
+
+def plot_motiv_example():
+    overview_NOIV = pd.read_csv(
+        "./../data/local/motivatingExample/00_overview_NOIV.txt",
+        sep=";",
+        header=0,
+    )
+    overview_trainIV = pd.read_csv(
+        "./../data/local/motivatingExample/00_overview_trainIV.txt",
+        sep=";",
+        header=0,
+    )
+    overview_testIV = pd.read_csv(
+        "./../data/local/motivatingExample/00_overview_testIV.txt",
+        sep=";",
+        header=0,
+    )
+
+    pred_cntl = pd.read_csv(
+        "./../data/local/motivatingExample/01_pred_cntl.txt", sep=";", header=0
+    )
+    pred_coldsun = pd.read_csv(
+        "./../data/local/motivatingExample/01_pred_coldsun.txt",
+        sep=";",
+        header=0,
+    )
+    pred_warmsun = pd.read_csv(
+        "./../data/local/motivatingExample/01_pred_warmsun.txt",
+        sep=";",
+        header=0,
+    )
+
+    fig, axes = plt.subplots(3, 3, figsize=(22, 22))
+    #     fig, axs = plt.subplot_mosaic([['a)', 'c)'], ['b)', 'c)'], ['d)', 'd)']],
+    #                               constrained_layout=True)
+
+    """ a. No Interventions """
+    ax = axes[0, 0]
+    ax.plot(
+        overview_NOIV[overview_NOIV["scen"] == "cntl"]["year"],
+        overview_NOIV[overview_NOIV["scen"] == "cntl"]["T_glm"],
+        color="darkorange",
+        label="Control runs",
+    )
+
+    start_years = np.unique(
+        overview_NOIV[overview_NOIV["scen"] == "1perCO2"]["start.year"]
+    )
+    for i in range(len(start_years)):
+        tmp = overview_NOIV[
+            (overview_NOIV["scen"] == "1perCO2")
+            & (overview_NOIV["start.year"] == start_years[i])
+        ]
+        if i == 0:
+            ax.plot(
+                tmp["year"],
+                tmp["T_glm"],
+                color="dimgrey",
+                label=r"1\%/yr CO2 increase",
+            )
+        else:
+            ax.plot(tmp["year"], tmp["T_glm"], color="dimgrey")
+
+    ax.set_ylim([-5, 10])
+    ax.set_yticks([-5, 0, 5, 10])
+    ax.legend(fontsize=params["axes.labelsize"] - 6)
+    ax.set_xlabel("Year", fontsize=params["axes.labelsize"])
+    ax.set_ylabel(
+        "Global Mean Temperature Anomaly (°C)",
+        fontsize=params["axes.labelsize"],
+    )
+    ax.set_title("No Interventions")
+    trans = mtransforms.ScaledTranslation(
+        -20 / 72, 7 / 72, fig.dpi_scale_trans
+    )
+    ax.text(
+        -0.07,
+        1.0,
+        "(a)",
+        transform=ax.transAxes + trans,
+        fontsize=16,
+        va="bottom",
+        fontfamily="serif",
+    )
+
+    """ b. TRAINING DATA """
+    ax = axes[0, 1]
+    ax.plot(
+        overview_trainIV[overview_trainIV["scen"] == "cntl"]["year"],
+        overview_trainIV[overview_trainIV["scen"] == "cntl"]["T_glm"],
+        color="darkorange",
+    )
+    ax.plot(
+        overview_trainIV[overview_trainIV["scen"] == "plus6W"]["year"],
+        overview_trainIV[overview_trainIV["scen"] == "plus6W"]["T_glm"],
+        color="red",
+        label="warm sun ($+6$Wm$^{-2}$)",
+    )
+    ax.plot(
+        overview_trainIV[overview_trainIV["scen"] == "minus6W"]["year"],
+        overview_trainIV[overview_trainIV["scen"] == "minus6W"]["T_glm"],
+        color="lightblue",
+        label="cool sun ($-6$Wm$^{-2}$)",
+    )
+
+    start_years = np.unique(
+        overview_trainIV[overview_trainIV["scen"] == "1perCO2"]["start.year"]
+    )
+    for i in range(len(start_years)):
+        tmp = overview_trainIV[
+            (overview_trainIV["scen"] == "1perCO2")
+            & (overview_trainIV["start.year"] == start_years[i])
+        ]
+        ax.plot(tmp["year"], tmp["T_glm"], color="dimgrey")
+
+    start_years = np.unique(
+        overview_trainIV[overview_trainIV["scen"] == "plus6W.1perCO2"][
+            "start.year"
+        ]
+    )
+    for i in range(len(start_years)):
+        tmp = overview_trainIV[
+            (overview_trainIV["scen"] == "plus6W.1perCO2")
+            & (overview_trainIV["start.year"] == start_years[i])
+        ]
+        ax.plot(tmp["year"], tmp["T_glm"], color="dimgrey")
+
+    start_years = np.unique(
+        overview_trainIV[overview_trainIV["scen"] == "minus6W.1perCO2"][
+            "start.year"
+        ]
+    )
+    for i in range(len(start_years)):
+        tmp = overview_trainIV[
+            (overview_trainIV["scen"] == "minus6W.1perCO2")
+            & (overview_trainIV["start.year"] == start_years[i])
+        ]
+        ax.plot(tmp["year"], tmp["T_glm"], color="dimgrey")
+
+    ax.set_ylim([-5, 10])
+    ax.set_yticks([-5, 0, 5, 10])
+    ax.legend(fontsize=params["axes.labelsize"] - 6)
+    ax.set_xlabel("Year", fontsize=params["axes.labelsize"])
+    ax.set_ylabel(
+        "Global Mean Temperature Anomaly (°C)",
+        fontsize=params["axes.labelsize"],
+    )
+    ax.set_title("Small Interventions (Training data)")
+    trans = mtransforms.ScaledTranslation(
+        -20 / 72, 7 / 72, fig.dpi_scale_trans
+    )
+    ax.text(
+        -0.07,
+        1.0,
+        "(b)",
+        transform=ax.transAxes + trans,
+        fontsize=16,
+        va="bottom",
+        fontfamily="serif",
+    )
+
+    """ b. TESTING DATA """
+    ax = axes[0, 2]
+    # only plot 2000 years for control runs
+    ax.plot(
+        overview_testIV[overview_testIV["scen"] == "cntl"]["year"].iloc[:2000],
+        overview_testIV[overview_testIV["scen"] == "cntl"]["T_glm"].iloc[
+            :2000
+        ],
+        color="darkorange",
+    )
+    ax.plot(
+        overview_testIV[overview_testIV["scen"] == "plus25W"]["year"],
+        overview_testIV[overview_testIV["scen"] == "plus25W"]["T_glm"],
+        color="darkred",
+        label="hot sun ($+25$Wm$^{-2}$)",
+    )
+    ax.plot(
+        overview_testIV[overview_testIV["scen"] == "minus25W"]["year"],
+        overview_testIV[overview_testIV["scen"] == "minus25W"]["T_glm"],
+        color="darkblue",
+        label="cold sun ($-25$Wm$^{-2}$)",
+    )
+
+    start_years = np.unique(
+        overview_testIV[overview_testIV["scen"] == "1perCO2"]["start.year"]
+    )
+    for i in range(len(start_years)):
+        tmp = overview_testIV[
+            (overview_testIV["scen"] == "1perCO2")
+            & (overview_testIV["start.year"] == start_years[i])
+        ]
+        ax.plot(tmp["year"], tmp["T_glm"], color="dimgrey")
+
+    start_years = np.unique(
+        overview_testIV[overview_testIV["scen"] == "plus25W.1perCO2"][
+            "start.year"
+        ]
+    )
+    for i in range(len(start_years)):
+        tmp = overview_testIV[
+            (overview_testIV["scen"] == "plus25W.1perCO2")
+            & (overview_testIV["start.year"] == start_years[i])
+        ]
+        ax.plot(tmp["year"], tmp["T_glm"], color="dimgrey")
+
+    start_years = np.unique(
+        overview_testIV[overview_testIV["scen"] == "minus25W.1perCO2"][
+            "start.year"
+        ]
+    )
+    for i in range(len(start_years)):
+        tmp = overview_testIV[
+            (overview_testIV["scen"] == "minus25W.1perCO2")
+            & (overview_testIV["start.year"] == start_years[i])
+        ]
+        ax.plot(tmp["year"], tmp["T_glm"], color="dimgrey")
+
+    #     ax.set_xlim([500, 2500])
+    ax.set_ylim([-5, 10])
+    ax.set_yticks([-5, 0, 5, 10])
+    ax.legend(fontsize=params["axes.labelsize"] - 6, ncol=2)
+    ax.set_xlabel("Year", fontsize=params["axes.labelsize"])
+    ax.set_ylabel(
+        "Global Mean Temperature Anomaly (°C)",
+        fontsize=params["axes.labelsize"],
+    )
+    ax.set_title("Strong Interventions (Test data)")
+    trans = mtransforms.ScaledTranslation(
+        -20 / 72, 7 / 72, fig.dpi_scale_trans
+    )
+    ax.text(
+        -0.07,
+        1.0,
+        "(c)",
+        transform=ax.transAxes + trans,
+        fontsize=16,
+        va="bottom",
+        fontfamily="serif",
+    )
+
+    """ ii. Plot predictions and residuals """
+    flim = [-5, 15]
+
+    """NO INTERVENTIONS"""
+    ax = axes[1, 0]
+    ax.plot(
+        pred_cntl["y_cntl"], pred_cntl["yhat_cntl_A1"], ".", color="darkorange"
+    )
+    x = np.linspace(-5, 15, 100)
+    ax.plot(x, x, "darkgrey", linestyle="solid")
+    ax.set_xlim(flim)
+    ax.set_ylim(flim)
+    ax.set_yticks([-5, 0, 5, 10, 15])
+    ax.set_xlabel("True CO$_2$ forcing (Wm$^{-2}$)")
+    ax.set_ylabel("Predicted CO$_2$ forcing (Wm$^{-2}$)")
+    ax.set_title("No Interventions")
+    rmse = np.round(
+        np.sqrt(
+            np.mean((pred_cntl["y_cntl"] - pred_cntl["yhat_cntl_A1"]) ** 2)
+        ),
+        2,
+    )
+    corr = np.round(
+        np.corrcoef(pred_cntl["y_cntl"], pred_cntl["yhat_cntl_A1"])[0, 1], 2
+    )
+    ax.text(
+        5,
+        13.5,
+        "$\\gamma = 1$ (RMSE = "
+        + str(rmse)
+        + ", $\\rho$ = "
+        + str(corr)
+        + ")",
+        ha="center",
+        va="center",
+        rotation=0,
+        size=16,
+        bbox=dict(boxstyle="round, pad=0.4", fc="white", ec="lightgrey", lw=1),
+    )
+    trans = mtransforms.ScaledTranslation(
+        -20 / 72, 7 / 72, fig.dpi_scale_trans
+    )
+    ax.text(
+        -0.07,
+        1.0,
+        "(d)",
+        transform=ax.transAxes + trans,
+        fontsize=16,
+        va="bottom",
+        fontfamily="serif",
+    )
+
+    ax = axes[2, 0]
+    ax.plot(
+        pred_cntl["y_cntl"],
+        pred_cntl["yhat_cntl_A100"],
+        ".",
+        color="darkorange",
+    )
+    x = np.linspace(-5, 15, 100)
+    ax.plot(x, x, "darkgrey", linestyle="solid")
+    ax.set_xlim(flim)
+    ax.set_ylim(flim)
+    ax.set_yticks([-5, 0, 5, 10, 15])
+    ax.set_xlabel("True CO$_2$ forcing (Wm$^{-2}$)")
+    ax.set_ylabel("Predicted CO$_2$ forcing (Wm$^{-2}$)")
+    ax.set_title("No Interventions")
+    rmse = np.round(
+        np.sqrt(
+            np.mean((pred_cntl["y_cntl"] - pred_cntl["yhat_cntl_A100"]) ** 2)
+        ),
+        2,
+    )
+    corr = np.round(
+        np.corrcoef(pred_cntl["y_cntl"], pred_cntl["yhat_cntl_A100"])[0, 1], 2
+    )
+    ax.text(
+        5,
+        13.5,
+        "$\\gamma = 100$ (RMSE = "
+        + str(rmse)
+        + ", $\\rho$ = "
+        + str(corr)
+        + ")",
+        ha="center",
+        va="center",
+        rotation=0,
+        size=16,
+        bbox=dict(boxstyle="round, pad=0.4", fc="white", ec="lightgrey", lw=1),
+    )
+    trans = mtransforms.ScaledTranslation(
+        -20 / 72, 7 / 72, fig.dpi_scale_trans
+    )
+    ax.text(
+        -0.07,
+        1.0,
+        "(g)",
+        transform=ax.transAxes + trans,
+        fontsize=16,
+        va="bottom",
+        fontfamily="serif",
+    )
+
+    """STRONG INTERVENTIONS"""
+
+    ax = axes[1, 1]
+    ax.plot(
+        pred_cntl["y_cntl"], pred_cntl["yhat_cntl_A1"], ".", color="darkorange"
+    )
+    ax.plot(
+        pred_warmsun["y_warmsun"],
+        pred_warmsun["yhat_warmsun_A1"],
+        ".",
+        color="darkred",
+    )
+    ax.plot(
+        pred_coldsun["y_coldsun"],
+        pred_coldsun["yhat_coldsun_A1"],
+        ".",
+        color="darkblue",
+    )
+    x = np.linspace(-5, 15, 100)
+    ax.plot(x, x, "darkgrey", linestyle="solid")
+    ax.set_xlim(flim)
+    ax.set_ylim(flim)
+    ax.set_yticks([-5, 0, 5, 10, 15])
+    ax.set_xlabel("True CO$_2$ forcing (Wm$^{-2}$)")
+    ax.set_ylabel("Predicted CO$_2$ forcing (Wm$^{-2}$)")
+    ax.set_title("Strong Interventions (Prediction)")
+    y_true = pd.concat(
+        [
+            pred_cntl["y_cntl"],
+            pred_warmsun["y_warmsun"],
+            pred_coldsun["y_coldsun"],
+        ]
+    )
+    yhat_pred = pd.concat(
+        [
+            pred_cntl["yhat_cntl_A1"],
+            pred_warmsun["yhat_warmsun_A1"],
+            pred_coldsun["yhat_coldsun_A1"],
+        ]
+    )
+    rmse = np.round(np.sqrt(np.mean((y_true - yhat_pred) ** 2)), 2)
+    corr = np.round(np.corrcoef(y_true, yhat_pred)[0, 1], 2)
+    ax.text(
+        5,
+        13.5,
+        "$\\gamma = 1$ (RMSE = "
+        + str(rmse)
+        + ", $\\rho$ = "
+        + str(corr)
+        + ")",
+        ha="center",
+        va="center",
+        rotation=0,
+        size=16,
+        bbox=dict(boxstyle="round, pad=0.4", fc="white", ec="lightgrey", lw=1),
+    )
+    trans = mtransforms.ScaledTranslation(
+        -20 / 72, 7 / 72, fig.dpi_scale_trans
+    )
+    ax.text(
+        -0.07,
+        1.0,
+        "(e)",
+        transform=ax.transAxes + trans,
+        fontsize=16,
+        va="bottom",
+        fontfamily="serif",
+    )
+
+    ax = axes[2, 1]
+    ax.plot(
+        pred_cntl["y_cntl"],
+        pred_cntl["yhat_cntl_A100"],
+        ".",
+        color="darkorange",
+    )
+    ax.plot(
+        pred_warmsun["y_warmsun"],
+        pred_warmsun["yhat_warmsun_A100"],
+        ".",
+        color="darkred",
+    )
+    ax.plot(
+        pred_coldsun["y_coldsun"],
+        pred_coldsun["yhat_coldsun_A100"],
+        ".",
+        color="darkblue",
+    )
+    x = np.linspace(-5, 15, 100)
+    ax.plot(x, x, "darkgrey", linestyle="solid")
+    ax.set_xlim(flim)
+    ax.set_ylim(flim)
+    ax.set_yticks([-5, 0, 5, 10, 15])
+    ax.set_xlabel("True CO$_2$ forcing (Wm$^{-2}$)")
+    ax.set_ylabel("Predicted CO$_2$ forcing (Wm$^{-2}$)")
+    ax.set_title("Strong Interventions (Prediction)")
+    y_true = pd.concat(
+        [
+            pred_cntl["y_cntl"],
+            pred_warmsun["y_warmsun"],
+            pred_coldsun["y_coldsun"],
+        ]
+    )
+    yhat_pred = pd.concat(
+        [
+            pred_cntl["yhat_cntl_A100"],
+            pred_warmsun["yhat_warmsun_A100"],
+            pred_coldsun["yhat_coldsun_A100"],
+        ]
+    )
+    rmse = np.round(np.sqrt(np.mean((y_true - yhat_pred) ** 2)), 2)
+    corr = np.round(np.corrcoef(y_true, yhat_pred)[0, 1], 2)
+    ax.text(
+        5,
+        13.5,
+        "$\\gamma = 100$ (RMSE = "
+        + str(rmse)
+        + ", $\\rho$ = "
+        + str(corr)
+        + ")",
+        ha="center",
+        va="center",
+        rotation=0,
+        size=16,
+        bbox=dict(boxstyle="round, pad=0.4", fc="white", ec="lightgrey", lw=1),
+    )
+    trans = mtransforms.ScaledTranslation(
+        -20 / 72, 7 / 72, fig.dpi_scale_trans
+    )
+    ax.text(
+        -0.07,
+        1.0,
+        "(h)",
+        transform=ax.transAxes + trans,
+        fontsize=16,
+        va="bottom",
+        fontfamily="serif",
+    )
+
+    """STRONG INTERVENTIONS, residual correlations"""
+    ax = axes[1, 2]
+    ax.plot(
+        np.repeat(0, 641),
+        pred_cntl["y_cntl"] - pred_cntl["yhat_cntl_A1"],
+        ".",
+        color="darkorange",
+    )
+    ax.plot(
+        np.repeat(25, 1423),
+        pred_warmsun["y_warmsun"] - pred_warmsun["yhat_warmsun_A1"],
+        ".",
+        color="darkred",
+    )
+    ax.plot(
+        np.repeat(-25, 1413),
+        pred_coldsun["y_coldsun"] - pred_coldsun["yhat_coldsun_A1"],
+        ".",
+        color="darkblue",
+    )
+    ax.set_xlim([-36, 35])
+    ax.set_ylim([-6, 6])
+    ax.set_xlabel("Solar anchor (Wm$^{-2}$)")
+    ax.set_ylabel("Prediction residuals")
+    ax.set_title(
+        "Strong Interventions (Residual correlation w. Anchor)",
+    )
+    res = pd.concat(
+        [
+            pred_cntl["y_cntl"] - pred_cntl["yhat_cntl_A1"],
+            pred_warmsun["y_warmsun"] - pred_warmsun["yhat_warmsun_A1"],
+            pred_coldsun["y_coldsun"] - pred_coldsun["yhat_coldsun_A1"],
+        ]
+    )
+    anchor = pd.concat(
+        [
+            pd.Series(np.repeat(0, 641)),
+            pd.Series(np.repeat(25, 1423)),
+            pd.Series(np.repeat(-25, 1413)),
+        ]
+    )
+    corr = np.round(np.corrcoef(res, anchor)[0, 1], 2)
+    ax.text(
+        0,
+        5.1,
+        "$\\gamma = 1$ ($\\rho$ = " + str(corr) + ")",
+        ha="center",
+        va="center",
+        rotation=0,
+        size=16,
+        bbox=dict(boxstyle="round, pad=0.4", fc="white", ec="lightgrey", lw=1),
+    )
+    trans = mtransforms.ScaledTranslation(
+        -20 / 72, 7 / 72, fig.dpi_scale_trans
+    )
+    ax.text(
+        -0.07,
+        1.0,
+        "(f)",
+        transform=ax.transAxes + trans,
+        fontsize=16,
+        va="bottom",
+        fontfamily="serif",
+    )
+
+    ax = axes[2, 2]
+    ax.plot(
+        np.repeat(0, 641),
+        pred_cntl["y_cntl"] - pred_cntl["yhat_cntl_A100"],
+        ".",
+        color="darkorange",
+    )
+    ax.plot(
+        np.repeat(25, 1423),
+        pred_warmsun["y_warmsun"] - pred_warmsun["yhat_warmsun_A100"],
+        ".",
+        color="darkred",
+    )
+    ax.plot(
+        np.repeat(-25, 1413),
+        pred_coldsun["y_coldsun"] - pred_coldsun["yhat_coldsun_A100"],
+        ".",
+        color="darkblue",
+    )
+    ax.set_xlim([-36, 35])
+    ax.set_ylim([-6, 6])
+    ax.set_xlabel("Solar anchor (Wm$^{-2}$)")
+    ax.set_ylabel("Prediction residuals")
+    ax.set_title("Strong Interventions (Residual correlation w. Anchor)")
+    res = pd.concat(
+        [
+            pred_cntl["y_cntl"] - pred_cntl["yhat_cntl_A100"],
+            pred_warmsun["y_warmsun"] - pred_warmsun["yhat_warmsun_A100"],
+            pred_coldsun["y_coldsun"] - pred_coldsun["yhat_coldsun_A100"],
+        ]
+    )
+    anchor = pd.concat(
+        [
+            pd.Series(np.repeat(0, 641)),
+            pd.Series(np.repeat(25, 1423)),
+            pd.Series(np.repeat(-25, 1413)),
+        ]
+    )
+    corr = np.round(np.corrcoef(res, anchor)[0, 1], 2)
+    ax.text(
+        0,
+        5.1,
+        "$\\gamma = 100$ ($\\rho$ = " + str(corr) + ")",
+        ha="center",
+        va="center",
+        rotation=0,
+        size=16,
+        bbox=dict(boxstyle="round, pad=0.4", fc="white", ec="lightgrey", lw=1),
+    )
+    trans = mtransforms.ScaledTranslation(
+        -20 / 72, 7 / 72, fig.dpi_scale_trans
+    )
+    ax.text(
+        -0.07,
+        1.0,
+        "(i)",
+        transform=ax.transAxes + trans,
+        fontsize=16,
+        va="bottom",
+        fontfamily="serif",
+    )
+
+    plt.subplots_adjust(hspace=0.25)
+
+    filename = "motivating_example.pdf"
+    if filename:
+        if not os.path.isdir("./../output/figures/"):
+            os.makedirs("./../output/figures/")
+        fig.savefig("./../output/figures/" + filename, bbox_inches="tight")
+
+    plt.show()

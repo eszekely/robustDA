@@ -86,7 +86,7 @@ def read_files_cmip6(params_climate, norm=True):
 
                                 if norm:
                                     """Remove mean of 1850-1900
-                                    for each model independently
+                                    for each model run independently
                                     """
                                     meanmap = np.mean(
                                         temp_ncdata_df.loc["1850":"1900"],
