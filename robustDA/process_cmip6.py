@@ -52,7 +52,7 @@ def read_files_cmip6(params_climate, norm=True):
             if (
                 var in filename
                 and temporalRes in filename
-                and "r1i1p1f1" in filename
+                and "r1i1p1f1" in filename  # only "r1i1p1f1 files are used"
             ):  # only full maps ("g025.nc")
 
                 for scen in scenarios:

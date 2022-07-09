@@ -115,6 +115,53 @@ def plotMapCartopy_subplots(
 
     if title_subplot is not None:
         ax.set_title(title_subplot, fontsize=params["axes.titlesize"])
+        
+        
+def plotMapCartopy_subplots_maps(
+    fig, ax, dataMap, cLim=None, dx=None, dy=None, title_subplot=None
+):
+    logs = np.arange(0, 360, 2.5)
+    lats = np.arange(-90, 90, 2.5)
+
+    ax_pos = ax.get_position()
+
+    ax.coastlines()
+    ax.gridlines()
+
+    if cLim is None:
+        cLim = max(abs(dataMap.flatten()))
+
+    h = ax.pcolormesh(
+        logs,
+        lats,
+        dataMap,
+        transform=ccrs.PlateCarree(),
+        cmap="RdBu_r",
+        vmin=-cLim,
+        vmax=cLim,
+    )
+
+    #     cbar_pos = [
+    #         0.183,
+    #         0.69,
+    #         0.16,
+    #         0.007,
+    #     ]  # [left,bottom,width,height] [0.18, 0.05, 0.159, 0.03]
+
+    cbar_pos = [ax_pos.x0 + dx, ax_pos.y0 + dy, 0.2, 0.008]
+    cbar_axes = fig.add_axes(cbar_pos)
+    cbar = fig.colorbar(
+        h,
+        cax=cbar_axes,
+        orientation="horizontal",
+    )
+    cbar.ax.locator_params(nbins=3)
+    cbar.ax.tick_params(labelsize=params["xtick.labelsize"])
+    cbar.outline.set_visible(False)
+
+    if title_subplot is not None:
+        ax.set_title(title_subplot, fontsize=params["axes.titlesize"])
+
 
 
 def make_plots(
@@ -572,9 +619,649 @@ def plot_CV_pareto_MSE(mse_df, lambdasSelAll, filename, folds):
 
     plt.close()
 
+    
+def plot_maps(
+    coefRaw,
+    coefRawRidge,
+    y_test_true,
+    y_test_pred,
+    y_test_pred_ridge,
+    y_anchor_test,
+    target,
+    anchor,
+    h_anchors,
+    rmse,
+    rmse_PA,
+    corr,
+    mi,
+    gamma_vals,
+    lambda_vals,
+    ind_gamma_opt,
+    ind_lambda_opt,
+    ind_lambda_opt_ridge,
+    ind_vect_ideal_obj1,
+    ind_vect_ideal_obj2,
+    filename=None,
+):
+
+    grid = (72, 144)
+
+    rmse_bagging = np.mean(rmse, axis=0)
+    rmse_PA_bagging = np.mean(rmse_PA, axis=0)
+    corr_bagging = np.mean(corr, axis=0)
+    mi_bagging = np.mean(mi, axis=0)
+
+    #     """ Evaluation measures (ridge) """
+    #     rmse_av = 0
+    #     r2_av = 0
+    #     corr_av = 0
+    #     corr2_av = 0
+    #     corr3_av = 0
+    #     mi_av = 0
+    #     for i in range(len(y_test_true)):
+    #         res = np.array(y_test_true[i]).reshape(-1, 1) - np.array(
+    #             y_test_pred[i]
+    #         ).reshape(-1, 1)
+    #         rmse_av = rmse_av + np.sqrt(np.mean(res ** 2))
+    #         r2_av = r2_av + r2_score(
+    #             np.array(y_test_true[i]).reshape(-1, 1),
+    #             np.array(y_test_pred[i]).reshape(-1, 1),
+    #         )
+    #         corr_av = (
+    #             corr_av
+    #             + np.corrcoef(
+    #                 np.array(y_anchor_test[i]).reshape(1, -1), res.reshape(1, -1)
+    #             )[0, 1]
+    #         )
+    #         mi_av = (
+    #             mi_av
+    #             + mutual_info_regression(
+    #                 np.array(y_anchor_test[i]).reshape(-1, 1), res.reshape(-1)
+    #             )[0]
+    #         )
+    #         if len(h_anchors) == 1:
+    #             corr2_av = corr2_av + np.corrcoef(
+    #                 np.array(y_anchor_test[i]).reshape(1, -1) ** 2,
+    #                 res.reshape(1, -1),
+    #             )[0, 1]
+    #         elif len(h_anchors) == 2:
+    #             corr3_av = corr3_av + np.corrcoef(
+    #                 np.abs(np.array(y_anchor_test[i]).reshape(1, -1)),
+    #                 res.reshape(1, -1),
+    #             )[0, 1]
+    #     rmse_av = rmse_av / (len(y_test_true))
+    #     r2_av = r2_av / len(y_test_true)
+    #     corr_av = corr_av / len(y_test_true)
+    #     corr2_av = corr2_av / len(y_test_true)
+    #     corr3_av = corr3_av / len(y_test_true)
+    #     mi_av = mi_av / len(y_test_true)
+
+    """ Evaluation measures (anchor) """
+    rmse_av = 0
+    r2_av = 0
+    corr_av = 0
+    corr2_av = 0
+    corr3_av = 0
+    mi_av = 0
+    for i in range(len(y_test_true)):
+        res = np.array(y_test_true[i]).reshape(-1, 1) - np.array(
+            y_test_pred[i]
+        ).reshape(-1, 1)
+        rmse_av = rmse_av + np.sqrt(np.mean(res ** 2))
+        r2_av = r2_av + r2_score(
+            np.array(y_test_true[i]).reshape(-1, 1),
+            np.array(y_test_pred[i]).reshape(-1, 1),
+        )
+        corr_av = (
+            corr_av
+            + np.corrcoef(
+                np.array(y_anchor_test[i]).reshape(1, -1), res.reshape(1, -1)
+            )[0, 1]
+        )
+        mi_av = (
+            mi_av
+            + mutual_info_regression(
+                np.array(y_anchor_test[i]).reshape(-1, 1), res.reshape(-1)
+            )[0]
+        )
+        if len(h_anchors) == 1:
+            corr2_av = corr2_av + np.corrcoef(
+                np.array(y_anchor_test[i]).reshape(1, -1) ** 2,
+                res.reshape(1, -1),
+            )[0, 1]
+        elif len(h_anchors) == 2:
+            corr3_av = corr3_av + np.corrcoef(
+                np.abs(np.array(y_anchor_test[i]).reshape(1, -1)),
+                res.reshape(1, -1),
+            )[0, 1]
+    rmse_av = rmse_av / (len(y_test_true))
+    r2_av = r2_av / len(y_test_true)
+    corr_av = corr_av / len(y_test_true)
+    corr2_av = corr2_av / len(y_test_true)
+    corr3_av = corr3_av / len(y_test_true)
+    mi_av = mi_av / len(y_test_true)
+
+    """ ############################ """
+    """       Plotting started       """
+    """ ############################ """
+    yt = np.array(list(flatten(y_test_true))).reshape(-1, 1)
+    yp = np.array(list(flatten(y_test_pred))).reshape(-1, 1)
+    #     yp_ridge = np.array(list(flatten(y_test_pred_ridge))).reshape(-1, 1)
+    ya = np.array(list(flatten(y_anchor_test))).reshape(-1, 1)
+    residuals = (yt - yp).reshape(-1)
+    #     residuals_ridge = (yt - yp_ridge).reshape(-1)
+
+    fig = plt.figure(figsize=(15, 12))
+    spec = gridspec.GridSpec(nrows=6, ncols=10)
+
+    #     """ --- RIDGE --- """
+    #     """ Plot map """
+    #     ax = fig.add_subplot(
+    #         spec[0:2, 0:4], projection=ccrs.Robinson(central_longitude=180)
+    #     )
+    #     title = "Raw coefficients (Ridge regression)"
+    #     plotMapCartopy_subplots(
+    #         fig, ax, coefRawRidge.reshape(grid), cLim=None, title_subplot=title
+    #     )
+
+    #     """ Prediction results """
+    #     ax = fig.add_subplot(spec[0:2, 4:7])
+    #     ax.plot(yt, yp_ridge, ".", color="darkseagreen", markersize=3, rasterized=True)
+    #     x = np.linspace(truncate(min(yt), 2), truncate(max(yt), 2))
+    #     ax.plot(x, x, "k", linestyle="solid")
+    #     ax.set_xlabel("True target " + target[:3].upper())
+    #     ax.set_ylabel("Predicted target " + target[:3].upper())
+    #     ax.set_title(
+    #         "Prediction: RMSE = " + str(np.round(rmse_av, 2)) + ", R2 = " + str(np.round(r2_av, 2)),
+    #         fontsize=params["axes.titlesize"],
+    #     )
+
+    #     """ Residuals """
+    #     ax = fig.add_subplot(spec[0:2, 7:10])
+    #     ax.plot(ya, residuals_ridge, ".", color="peru", markersize=3, rasterized=True)
+    #     ax.set_xlabel(
+    #         "Anchor $A$ (" + anchor[:3].upper() + " forcing)",
+    #         fontsize=params["axes.labelsize"],
+    #     )
+    #     ax.set_ylabel(
+    #         "Residuals " + target[:3].upper(), fontsize=params["axes.labelsize"]
+    #     )
+    #     if len(h_anchors) == 0:
+    #         ax.set_title(
+    #             "Correlation and independence: "
+    #             + "\n $\\rho (A)$ = "
+    #             + str(np.round(corr_av, 2))
+    #             + ", $I$ = "
+    #             + str(np.round(mi_av, 2)),
+    #             fontsize=params["axes.titlesize"],
+    #         )
+
+    #     elif len(h_anchors) == 1:
+    #         ax.set_title(
+    #             "Correlation and independence: "
+    #             + "\n $\\rho (A)$ = "
+    #             + str(np.round(corr_av, 2))
+    #             + ", $\\rho ($"
+    #             + display_nonlinear_anchors(h_anchors[0])
+    #             + "$)$ = "
+    #             + str(np.round(corr2_av, 2))
+    #             + ", $I$ = "
+    #             + str(np.round(mi_av, 2)),
+    #             fontsize=params["axes.titlesize"],
+    #         )
+
+    #     elif len(h_anchors) == 2:
+    #         ax.set_title(
+    #             anchor.upper()
+    #             + " anchor:  $\\rho (A)$ = "
+    #             + str(np.round(corr_av, 2))
+    #             + "\n $\\rho ($"
+    #             + display_nonlinear_anchors(h_anchors[0])
+    #             + "$)$ = "
+    #             + str(np.round(corr2_av, 2))
+    #             + ", $\\rho ($"
+    #             + display_nonlinear_anchors(h_anchors[1])
+    #             + "$)$ = "
+    #             + str(np.round(corr3_av, 2))
+    #             + ", $I$ = "
+    #             + str(np.round(mi_av, 2)),
+    #             fontsize=params["axes.titlesize"],
+    #         )
+
+    """ --- Ridge regression --- """
+    """ Plot map """
+    ax = fig.add_subplot(
+        spec[0:3, 0:5], projection=ccrs.Robinson(central_longitude=180)
+    )
+    title = "Raw coefficients (ridge regression)"
+    
+    if target == "GHG" and anchor == "aerosols":
+        clim_val = 0.01
+    elif target == "aerosols" and anchor == "co2":
+        clim_val = 0.008
+    else:
+        clim_val = 0.01
+    
+    plotMapCartopy_subplots_maps(
+        fig,
+        ax,
+        coefRawRidge.reshape(grid),
+        cLim=clim_val, 
+        dx=0.03,
+        dy=0.05,
+        title_subplot=title,
+    )
+
+    """ --- Anchor regression --- """
+    """ Plot map """
+    ax = fig.add_subplot(
+        spec[0:3, 5:10], projection=ccrs.Robinson(central_longitude=180)
+    )
+    title = "Raw coefficients (anchor regression)"
+    plotMapCartopy_subplots_maps(
+        fig,
+        ax,
+        coefRaw.reshape(grid),
+        cLim=clim_val,
+        dx=0.06,
+        dy=0.05,
+        title_subplot=title,
+    )
+
+    """ Prediction results """
+    ax = fig.add_subplot(spec[3:5, 0:5])
+    ax.plot(yt, yp, ".", color="darkseagreen", markersize=3, rasterized=True)
+    x = np.linspace(truncate(min(yt), 2), truncate(max(yt), 2))
+    ax.plot(x, x, "k", linestyle="solid")
+    ax.set_xlabel("True target $Y$ (" + target[:3].upper() + ")")
+    ax.set_ylabel(
+        r"Predicted target $\widehat{Y}$ (" + target[:3].upper() + ")"
+    )
+    ax.set_title(
+        "Prediction: $RMSE$ = "
+        + str(np.round(rmse_av, 2))
+        + ", $R^2$ = "
+        + str(np.round(r2_av, 2)),
+        fontsize=params["axes.titlesize"],
+    )
+
+    """ Residuals """
+    ax = fig.add_subplot(spec[3:5, 5:10])
+    ax.plot(ya, residuals, ".", color="peru", markersize=3, rasterized=True)
+    if anchor[:3] == "co2":
+        ax.set_xlabel(
+            "Anchor $A$ (CO$_2$)",
+            fontsize=params["axes.labelsize"],
+        )
+    else:
+        ax.set_xlabel(
+            "Anchor $A$ (" + anchor[:3].upper() + ")",
+            fontsize=params["axes.labelsize"],
+        )
+
+    ax.set_ylabel(
+        "Residuals (" + target[:3].upper() + ")",
+        fontsize=params["axes.labelsize"],
+    )
+#    if len(h_anchors) == 0:
+    ax.set_title(
+        r"Correlation \& independence: "
+        + "$\\rho (A)$ = "
+        + str(np.round(corr_av, 2))
+        + ", $I$ = "
+        + str(np.round(mi_av, 2)),
+        fontsize=params["axes.titlesize"],
+    )
+
+    # elif len(h_anchors) == 1:
+    #     ax.set_title(
+    #         r"Correlation \& independence: "
+    #         + "$\\rho (A)$ = "
+    #         + str(np.round(corr_av, 2))
+    #         + ", \n $\\rho ($"
+    #         + display_nonlinear_anchors(h_anchors[0])
+    #         + "$)$ = "
+    #         + str(np.round(corr2_av, 2))
+    #         + ", $I$ = "
+    #         + str(np.round(mi_av, 2)),
+    #         fontsize=params["axes.titlesize"],
+    #     )
+
+    # elif len(h_anchors) == 2:
+    #     ax.set_title(
+    #         r"Correlation \& independence: "
+    #         + "$\\rho (A)$ = "
+    #         + str(np.round(corr_av, 2))
+    #         + "$\\rho ($"
+    #         + display_nonlinear_anchors(h_anchors[0])
+    #         + "$)$ = "
+    #         + str(np.round(corr2_av, 2))
+    #         + ", \n $\\rho ($"
+    #         + display_nonlinear_anchors(h_anchors[1])
+    #         + "$)$ = "
+    #         + str(np.round(corr3_av, 2))
+    #         + ", $I$ = "
+    #         + str(np.round(mi_av, 2)),
+    #         fontsize=params["axes.titlesize"],
+    #     )
+    plt.subplots_adjust(wspace=5, hspace=0.4)
+
+    if filename:
+        if not os.path.isdir("./../output/figures/"):
+            os.makedirs("./../output/figures/")
+        fig.savefig("./../output/figures/" + filename, bbox_inches="tight")
+        
+        
+def plot_residuals(
+    y_test_true,
+    y_test_pred,
+    y_test_pred_ridge,
+    y_anchor_test,
+    target,
+    anchor,
+    h_anchors,
+    rmse,
+    rmse_PA,
+    corr,
+    mi,
+    gamma_vals,
+    lambda_vals,
+    ind_gamma_opt,
+    ind_lambda_opt,
+    ind_lambda_opt_ridge,
+    ind_vect_ideal_obj1,
+    ind_vect_ideal_obj2,
+    filename=None,
+):
+
+    grid = (72, 144)
+
+    rmse_bagging = np.mean(rmse, axis=0)
+    rmse_PA_bagging = np.mean(rmse_PA, axis=0)
+    corr_bagging = np.mean(corr, axis=0)
+    mi_bagging = np.mean(mi, axis=0)
+
+    """ Evaluation measures (anchor) """
+    rmse_av = 0
+    r2_av = 0
+    corr_av = 0
+    corr2_av = 0
+    corr3_av = 0
+    mi_av = 0
+    
+    for i in range(len(y_test_true)):
+        res = np.array(y_test_true[i]).reshape(-1, 1) - np.array(
+            y_test_pred[i]
+        ).reshape(-1, 1)
+        rmse_av = rmse_av + np.sqrt(np.mean(res ** 2))
+        r2_av = r2_av + r2_score(
+            np.array(y_test_true[i]).reshape(-1, 1),
+            np.array(y_test_pred[i]).reshape(-1, 1),
+        )
+        corr_av = (
+            corr_av
+            + np.corrcoef(
+                np.array(y_anchor_test[i]).reshape(1, -1), res.reshape(1, -1)
+            )[0, 1]
+        )
+        mi_av = (
+            mi_av
+            + mutual_info_regression(
+                np.array(y_anchor_test[i]).reshape(-1, 1), res.reshape(-1)
+            )[0]
+        )
+        if len(h_anchors) == 1:
+            corr2_av = corr2_av + np.corrcoef(
+                np.array(y_anchor_test[i]).reshape(1, -1) ** 2,
+                res.reshape(1, -1),
+            )[0, 1]
+        elif len(h_anchors) == 2:
+            corr3_av = corr3_av + np.corrcoef(
+                np.abs(np.array(y_anchor_test[i]).reshape(1, -1)),
+                res.reshape(1, -1),
+            )[0, 1]
+    rmse_av = rmse_av / (len(y_test_true))
+    r2_av = r2_av / len(y_test_true)
+    corr_av = corr_av / len(y_test_true)
+    corr2_av = corr2_av / len(y_test_true)
+    corr3_av = corr3_av / len(y_test_true)
+    mi_av = mi_av / len(y_test_true)
+
+    """ ############################ """
+    """       Plotting started       """
+    """ ############################ """
+    yt = np.array(list(flatten(y_test_true))).reshape(-1, 1)
+    yp = np.array(list(flatten(y_test_pred))).reshape(-1, 1)
+    yp_ridge = np.array(list(flatten(y_test_pred_ridge))).reshape(-1, 1)
+    ya = np.array(list(flatten(y_anchor_test))).reshape(-1, 1)
+    residuals = (yt - yp).reshape(-1)
+    residuals_ridge = (yt - yp_ridge).reshape(-1)
+
+    fig, (ax1) = plt.subplots(1, 1, figsize=(6, 3))
+
+    """ Residuals """
+    ax1.plot(ya, residuals, ".", color="peru", markersize=3, rasterized=True)
+    if anchor[:3] == "co2":
+        ax1.set_xlabel(
+            "Anchor $A$ (CO$_2$)",
+            fontsize=params["axes.labelsize"],
+        )
+    else:
+        ax1.set_xlabel(
+            "Anchor $A$ (" + anchor[:3].upper() + ")",
+            fontsize=params["axes.labelsize"],
+        )
+
+    ax1.set_ylabel(
+        "Residuals (" + target[:3].upper() + ")",
+        fontsize=params["axes.labelsize"],
+    )
+#    if len(h_anchors) == 0:
+    ax1.set_title(
+        r"Correlation \& dependence: "
+        + "$\\rho (A)$ = "
+        + str(np.round(corr_av, 2))
+        + ", $I$ = "
+        + str(np.round(mi_av, 2)),
+        fontsize=params["axes.titlesize"],
+    )
+
+    # elif len(h_anchors) == 1:
+    #     ax.set_title(
+    #         r"Correlation \& independence: "
+    #         + "$\\rho (A)$ = "
+    #         + str(np.round(corr_av, 2))
+    #         + ", \n $\\rho ($"
+    #         + display_nonlinear_anchors(h_anchors[0])
+    #         + "$)$ = "
+    #         + str(np.round(corr2_av, 2))
+    #         + ", $I$ = "
+    #         + str(np.round(mi_av, 2)),
+    #         fontsize=params["axes.titlesize"],
+    #     )
+
+    # elif len(h_anchors) == 2:
+    #     ax.set_title(
+    #         r"Correlation \& independence: "
+    #         + "$\\rho (A)$ = "
+    #         + str(np.round(corr_av, 2))
+    #         + "$\\rho ($"
+    #         + display_nonlinear_anchors(h_anchors[0])
+    #         + "$)$ = "
+    #         + str(np.round(corr2_av, 2))
+    #         + ", \n $\\rho ($"
+    #         + display_nonlinear_anchors(h_anchors[1])
+    #         + "$)$ = "
+    #         + str(np.round(corr3_av, 2))
+    #         + ", $I$ = "
+    #         + str(np.round(mi_av, 2)),
+    #         fontsize=params["axes.titlesize"],
+    #     )
+    plt.subplots_adjust(wspace=5, hspace=0.4)
+
+    if filename:
+        if not os.path.isdir("./../output/figures/"):
+            os.makedirs("./../output/figures/")
+        fig.savefig("./../output/figures/" + filename, bbox_inches="tight")
+        
+        
+def plot_residuals_ridge(
+    y_test_true,
+    y_test_pred,
+    y_test_pred_ridge,
+    y_anchor_test,
+    target,
+    anchor,
+    h_anchors,
+    rmse,
+    rmse_PA,
+    corr,
+    mi,
+    gamma_vals,
+    lambda_vals,
+    ind_gamma_opt,
+    ind_lambda_opt,
+    ind_lambda_opt_ridge,
+    ind_vect_ideal_obj1,
+    ind_vect_ideal_obj2,
+    filename=None,
+):
+
+    grid = (72, 144)
+
+    rmse_bagging = np.mean(rmse, axis=0)
+    rmse_PA_bagging = np.mean(rmse_PA, axis=0)
+    corr_bagging = np.mean(corr, axis=0)
+    mi_bagging = np.mean(mi, axis=0)
+
+
+    """ Evaluation measures (anchor) """
+    rmse_av = 0
+    r2_av = 0
+    corr_av = 0
+    corr2_av = 0
+    corr3_av = 0
+    mi_av = 0
+    
+    for i in range(len(y_test_true)):
+        res = np.array(y_test_true[i]).reshape(-1, 1) - np.array(
+            y_test_pred_ridge[i]
+        ).reshape(-1, 1)
+        rmse_av = rmse_av + np.sqrt(np.mean(res ** 2))
+        r2_av = r2_av + r2_score(
+            np.array(y_test_true[i]).reshape(-1, 1),
+            np.array(y_test_pred_ridge[i]).reshape(-1, 1),
+        )
+        corr_av = (
+            corr_av
+            + np.corrcoef(
+                np.array(y_anchor_test[i]).reshape(1, -1), res.reshape(1, -1)
+            )[0, 1]
+        )
+        mi_av = (
+            mi_av
+            + mutual_info_regression(
+                np.array(y_anchor_test[i]).reshape(-1, 1), res.reshape(-1)
+            )[0]
+        )
+        if len(h_anchors) == 1:
+            corr2_av = corr2_av + np.corrcoef(
+                np.array(y_anchor_test[i]).reshape(1, -1) ** 2,
+                res.reshape(1, -1),
+            )[0, 1]
+        elif len(h_anchors) == 2:
+            corr3_av = corr3_av + np.corrcoef(
+                np.abs(np.array(y_anchor_test[i]).reshape(1, -1)),
+                res.reshape(1, -1),
+            )[0, 1]
+    rmse_av = rmse_av / (len(y_test_true))
+    r2_av = r2_av / len(y_test_true)
+    corr_av = corr_av / len(y_test_true)
+    corr2_av = corr2_av / len(y_test_true)
+    corr3_av = corr3_av / len(y_test_true)
+    mi_av = mi_av / len(y_test_true)
+
+    """ ############################ """
+    """       Plotting started       """
+    """ ############################ """
+    yt = np.array(list(flatten(y_test_true))).reshape(-1, 1)
+    yp = np.array(list(flatten(y_test_pred))).reshape(-1, 1)
+    yp_ridge = np.array(list(flatten(y_test_pred_ridge))).reshape(-1, 1)
+    ya = np.array(list(flatten(y_anchor_test))).reshape(-1, 1)
+    residuals = (yt - yp).reshape(-1)
+    residuals_ridge = (yt - yp_ridge).reshape(-1)
+
+    fig, (ax1) = plt.subplots(1, 1, figsize=(6, 3))
+
+    """ Residuals """
+    ax1.plot(ya, residuals_ridge, ".", color="peru", markersize=3, rasterized=True)
+    if anchor[:3] == "co2":
+        ax1.set_xlabel(
+            "Anchor $A$ (CO$_2$)",
+            fontsize=params["axes.labelsize"],
+        )
+    else:
+        ax1.set_xlabel(
+            "Anchor $A$ (" + anchor[:3].upper() + ")",
+            fontsize=params["axes.labelsize"],
+        )
+
+    ax1.set_ylabel(
+        "Residuals (" + target[:3].upper() + ")",
+        fontsize=params["axes.labelsize"],
+    )
+#    if len(h_anchors) == 0:
+    ax1.set_title(
+        r"Correlation \& independence: "
+        + "$\\rho (A)$ = "
+        + str(np.round(corr_av, 2))
+        + ", $I$ = "
+        + str(np.round(mi_av, 2)),
+        fontsize=params["axes.titlesize"],
+    )
+
+    # elif len(h_anchors) == 1:
+    #     ax.set_title(
+    #         r"Correlation \& independence: "
+    #         + "$\\rho (A)$ = "
+    #         + str(np.round(corr_av, 2))
+    #         + ", \n $\\rho ($"
+    #         + display_nonlinear_anchors(h_anchors[0])
+    #         + "$)$ = "
+    #         + str(np.round(corr2_av, 2))
+    #         + ", $I$ = "
+    #         + str(np.round(mi_av, 2)),
+    #         fontsize=params["axes.titlesize"],
+    #     )
+
+    # elif len(h_anchors) == 2:
+    #     ax.set_title(
+    #         r"Correlation \& independence: "
+    #         + "$\\rho (A)$ = "
+    #         + str(np.round(corr_av, 2))
+    #         + "$\\rho ($"
+    #         + display_nonlinear_anchors(h_anchors[0])
+    #         + "$)$ = "
+    #         + str(np.round(corr2_av, 2))
+    #         + ", \n $\\rho ($"
+    #         + display_nonlinear_anchors(h_anchors[1])
+    #         + "$)$ = "
+    #         + str(np.round(corr3_av, 2))
+    #         + ", $I$ = "
+    #         + str(np.round(mi_av, 2)),
+    #         fontsize=params["axes.titlesize"],
+    #     )
+    plt.subplots_adjust(wspace=5, hspace=0.4)
+
+    if filename:
+        if not os.path.isdir("./../output/figures/"):
+            os.makedirs("./../output/figures/")
+        fig.savefig("./../output/figures/" + filename, bbox_inches="tight")
+    
 
 def plot_Pareto(
     rmse,
+    rmse_PA,
     corr,
     mi,
     h_anchors,
@@ -589,6 +1276,7 @@ def plot_Pareto(
 ):
 
     rmse_bagging = np.mean(rmse, axis=0)
+    rmse_PA_bagging = np.mean(rmse_PA, axis=0)
     corr_bagging = np.mean(corr, axis=0)
     mi_bagging = np.mean(mi, axis=0)
 
@@ -614,22 +1302,42 @@ def plot_Pareto(
     #         rmse, mi, maxX=False, maxY=False,)
 
     for i in range(rmse_bagging.shape[0]):
-        (line,) = ax1.plot(
-            rmse_bagging[i, :],
-            corr_bagging[i, :],
-            ".-",
-            label="$\\gamma = $ " + str(gamma_vals[i]),
-        )
+        
+        gamma_exponent = np.log10(gamma_vals[i])
+ 
+        if gamma_exponent.is_integer():
+            if gamma_exponent == 0 or gamma_exponent == 1: # if gamma=1 or gamma=10
+                (line,) = ax1.plot(
+                    rmse_bagging[i, :],
+                    rmse_PA_bagging[i, :],
+                    ".-",
+                    label="$\\gamma = {}$ ".format(gamma_vals[i]),
+                )
+            elif gamma_exponent > 1:
+                (line,) = ax1.plot(
+                    rmse_bagging[i, :],
+                    rmse_PA_bagging[i, :],
+                    ".-",
+                    label="$\\gamma = 10^{}$ ".format(int(gamma_exponent)),
+                )
+        else:
+            (line,) = ax1.plot(
+                rmse_bagging[i, :],
+                rmse_PA_bagging[i, :],
+                ".-",
+                label="$\\gamma = {}$ ".format(gamma_vals[i]),
+            )
+            
         ax1.plot(
             rmse_bagging[i, 0],
-            corr_bagging[i, 0],
+            rmse_PA_bagging[i, 0],
             color=line.get_color(),
             marker="o",
-            markersize=10,
+            markersize=8,
         )
     ax1.plot(
         rmse_bagging[i1, i2],
-        corr_bagging[i1, i2],
+        rmse_PA_bagging[i1, i2],
         "ks",
     )
     ax1.plot(
@@ -637,26 +1345,26 @@ def plot_Pareto(
             iv1[0].astype(int),
             iv1[1].astype(int),
         ],
-        corr_bagging[
+        rmse_PA_bagging[
             iv2[0].astype(int),
             iv2[1].astype(int),
         ],
         "k^",
-        markersize=8,
+        markersize=7,
         label="Ideal vector",
     )
     ax1.plot(
         rmse_bagging[0, i2_ridge],
-        corr_bagging[0, i2_ridge],
-        "ko",
-        markersize=9,
+        rmse_PA_bagging[0, i2_ridge],
+        "ks",
+        markersize=7,
         label="Ridge (optimal)",
     )
     ax1.plot(
         rmse_bagging[i1, i2],
-        corr_bagging[i1, i2],
-        "ks",
-        markersize=8,
+        rmse_PA_bagging[i1, i2],
+        "ko",
+        markersize=7,
         label="Anchor (optimal)",
     )
 
@@ -665,61 +1373,93 @@ def plot_Pareto(
     #     ax1.set_xticks(ticks)
     #     ax1.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
     ax1.set_xlabel(
-        "Root mean squared error (RMSE)  (" u"\N{DEGREE SIGN}C)",
+        "Root mean squared error ($RMSE$)  (" u"\N{DEGREE SIGN}C)",
         fontsize=params["axes.labelsize"],
     )
     ax1.set_ylabel(
-        "Linear correlation (residuals, anchor)",
+        "$RMSE_{\Pi_{\mathbf{A}}}$ (error explained by $A$)",
         fontsize=params["axes.labelsize"],
     )
     ax1.legend(fontsize=params["axes.labelsize"] - 4)
 
-    for i in range(rmse_bagging.shape[0]):
-        (line,) = ax2.plot(
-            rmse_bagging[i, :],
-            mi_bagging[i, :],
-            ".-",
-            label="$\\gamma = $ " + str(gamma_vals[i]),
+    if len(h_anchors) == 0: # plot correlation
+        for i in range(rmse_bagging.shape[0]):
+            (line,) = ax2.plot(
+                rmse_bagging[i, :],
+                corr_bagging[i, :],
+                ".-",
+                label="$\\gamma = $ " + str(gamma_vals[i]),
+            )
+            ax2.plot(
+                rmse_bagging[i, 0],
+                corr_bagging[i, 0],
+                color=line.get_color(),
+                marker="o",
+                markersize=8,
+            )
+        ax2.plot(
+            rmse_bagging[i1, i2],
+            corr_bagging[i1, i2], # corr for linear anchor and mi for nonlinear anchor
+            "ko",
+            markersize=7,
         )
         ax2.plot(
-            rmse_bagging[i, 0],
-            mi_bagging[i, 0],
-            color=line.get_color(),
-            marker="o",
-            markersize=10,
+            rmse_bagging[0, i2_ridge],
+            corr_bagging[0, i2_ridge],
+            "ks",
+            markersize=7,
         )
-    ax2.plot(
-        rmse_bagging[i1, i2],
-        mi_bagging[i1, i2],
-        "ks",
-    )
-    # plot ideal vector
-    ax2.plot(
-        rmse_bagging[
-            iv1[0].astype(int),
-            iv1[1].astype(int),
-        ],
-        mi_bagging[iv2[0].astype(int), iv2[1]].astype(int),
-        "k^",
-        markersize=8,
-    )
-    ax2.plot(
-        rmse_bagging[0, i2_ridge], mi_bagging[0, i2_ridge], "ko", markersize=9
-    )
-    ax2.plot(rmse_bagging[i1, i2], mi_bagging[i1, i2], "ks", markersize=8)
-
-    #     ax2.set_xscale("log")
-    #     ticks = [0.5, 0.6, 0.8, 1, 1.5, 2]
-    #     ax2.set_xticks(ticks)
-    #     ax2.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
-    ax2.set_xlabel(
-        "Root mean squared error (RMSE)  (" u"\N{DEGREE SIGN}C)",
-        fontsize=params["axes.labelsize"],
-    )
-    ax2.set_ylabel(
-        "Mutual information (residuals, anchor)",
-        fontsize=params["axes.labelsize"],
-    )
+        #     ax.set_yscale("log")
+        #     ticks = [0.6, 0.8, 1, 2, 3, 4, 5, 6, 7]
+        #     ax.set_xticks(ticks)
+        #     ax.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+        ax2.set_xlabel(
+            "Root mean squared error ($RMSE$) (" u"\N{DEGREE SIGN}C)",
+            fontsize=params["axes.labelsize"],
+        )
+        ax2.set_ylabel(
+            "Linear correlation (residuals, anchor)",
+            fontsize=params["axes.labelsize"],
+        )
+    else: # plot mutual information
+        for i in range(rmse_bagging.shape[0]):
+            (line,) = ax2.plot(
+                rmse_bagging[i, :],
+                mi_bagging[i, :],
+                ".-",
+                label="$\\gamma = $ " + str(gamma_vals[i]),
+            )
+            ax2.plot(
+                rmse_bagging[i, 0],
+                mi_bagging[i, 0],
+                color=line.get_color(),
+                marker="o",
+                markersize=8,
+            )
+        ax2.plot(
+            rmse_bagging[i1, i2],
+            mi_bagging[i1, i2], 
+            "ko",
+            markersize=7,
+        )
+        ax2.plot(
+            rmse_bagging[0, i2_ridge],
+            mi_bagging[0, i2_ridge],
+            "ks",
+            markersize=7,
+        )
+        #     ax.set_yscale("log")
+        #     ticks = [0.6, 0.8, 1, 2, 3, 4, 5, 6, 7]
+        #     ax.set_xticks(ticks)
+        #     ax.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+        ax2.set_xlabel(
+            "Root mean squared error ($RMSE$) (" u"\N{DEGREE SIGN}C)",
+            fontsize=params["axes.labelsize"],
+        )
+        ax2.set_ylabel(
+            "Mutual information (residuals, anchor)",
+            fontsize=params["axes.labelsize"],
+        )
 
     plt.subplots_adjust(wspace=0.25)
 
@@ -1316,6 +2056,9 @@ def plot_all(
         )
 
 
+""" Main plotting function """
+
+
 def plot_all_v2(
     coefRaw,
     coefRawRidge,
@@ -1327,6 +2070,7 @@ def plot_all_v2(
     anchor,
     h_anchors,
     rmse,
+    rmse_PA,
     corr,
     mi,
     gamma_vals,
@@ -1344,6 +2088,7 @@ def plot_all_v2(
     grid = (72, 144)
 
     rmse_bagging = np.mean(rmse, axis=0)
+    rmse_PA_bagging = np.mean(rmse_PA, axis=0)
     corr_bagging = np.mean(corr, axis=0)
     mi_bagging = np.mean(mi, axis=0)
 
@@ -1530,11 +2275,19 @@ def plot_all_v2(
         spec[0:3, 0:5], projection=ccrs.Robinson(central_longitude=180)
     )
     title = "Raw coefficients (ridge regression)"
+    
+    if target == "GHG" and anchor == "aerosols":
+        clim_val = 0.01
+    elif target == "aerosols" and anchor == "co2":
+        clim_val = 0.008
+    else:
+        clim_val = 0.01
+    
     plotMapCartopy_subplots(
         fig,
         ax,
         coefRawRidge.reshape(grid),
-        cLim=0.005,
+        cLim=clim_val, 
         dx=0.030,
         dy=0.04,
         title_subplot=title,
@@ -1551,7 +2304,7 @@ def plot_all_v2(
         fig,
         ax,
         coefRaw.reshape(grid),
-        cLim=0.005,
+        cLim=clim_val,
         dx=0.06,
         dy=0.04,
         title_subplot=title,
@@ -1568,9 +2321,9 @@ def plot_all_v2(
         r"Predicted target $\widehat{Y}$ (" + target[:3].upper() + ")"
     )
     ax.set_title(
-        "Prediction: RMSE = "
+        "Prediction: $RMSE$ = "
         + str(np.round(rmse_av, 2))
-        + ", R2 = "
+        + ", $R^2$ = "
         + str(np.round(r2_av, 2)),
         fontsize=params["axes.titlesize"],
     )
@@ -1594,47 +2347,47 @@ def plot_all_v2(
         "Residuals (" + target[:3].upper() + ")",
         fontsize=params["axes.labelsize"],
     )
-    if len(h_anchors) == 0:
-        ax.set_title(
-            r"Correlation \& independence: "
-            + "$\\rho (A)$ = "
-            + str(np.round(corr_av, 2))
-            + ", $I$ = "
-            + str(np.round(mi_av, 2)),
-            fontsize=params["axes.titlesize"],
-        )
+#    if len(h_anchors) == 0:
+    ax.set_title(
+        r"Correlation \& dependence: "
+        + "$\\rho (A)$ = "
+        + str(np.round(corr_av, 2))
+        + ", $I$ = "
+        + str(np.round(mi_av, 2)),
+        fontsize=params["axes.titlesize"],
+    )
 
-    elif len(h_anchors) == 1:
-        ax.set_title(
-            r"Correlation \& independence: "
-            + "$\\rho (A)$ = "
-            + str(np.round(corr_av, 2))
-            + ", \n $\\rho ($"
-            + display_nonlinear_anchors(h_anchors[0])
-            + "$)$ = "
-            + str(np.round(corr2_av, 2))
-            + ", $I$ = "
-            + str(np.round(mi_av, 2)),
-            fontsize=params["axes.titlesize"],
-        )
+    # elif len(h_anchors) == 1:
+    #     ax.set_title(
+    #         r"Correlation \& independence: "
+    #         + "$\\rho (A)$ = "
+    #         + str(np.round(corr_av, 2))
+    #         + ", \n $\\rho ($"
+    #         + display_nonlinear_anchors(h_anchors[0])
+    #         + "$)$ = "
+    #         + str(np.round(corr2_av, 2))
+    #         + ", $I$ = "
+    #         + str(np.round(mi_av, 2)),
+    #         fontsize=params["axes.titlesize"],
+    #     )
 
-    elif len(h_anchors) == 2:
-        ax.set_title(
-            r"Correlation \& independence: "
-            + "$\\rho (A)$ = "
-            + str(np.round(corr_av, 2))
-            + "$\\rho ($"
-            + display_nonlinear_anchors(h_anchors[0])
-            + "$)$ = "
-            + str(np.round(corr2_av, 2))
-            + ", \n $\\rho ($"
-            + display_nonlinear_anchors(h_anchors[1])
-            + "$)$ = "
-            + str(np.round(corr3_av, 2))
-            + ", $I$ = "
-            + str(np.round(mi_av, 2)),
-            fontsize=params["axes.titlesize"],
-        )
+    # elif len(h_anchors) == 2:
+    #     ax.set_title(
+    #         r"Correlation \& independence: "
+    #         + "$\\rho (A)$ = "
+    #         + str(np.round(corr_av, 2))
+    #         + "$\\rho ($"
+    #         + display_nonlinear_anchors(h_anchors[0])
+    #         + "$)$ = "
+    #         + str(np.round(corr2_av, 2))
+    #         + ", \n $\\rho ($"
+    #         + display_nonlinear_anchors(h_anchors[1])
+    #         + "$)$ = "
+    #         + str(np.round(corr3_av, 2))
+    #         + ", $I$ = "
+    #         + str(np.round(mi_av, 2)),
+    #         fontsize=params["axes.titlesize"],
+    #     )
     label_panel(ax, "D")
 
     """ Plot RMSE vs correlation vs MI """
@@ -1657,59 +2410,86 @@ def plot_all_v2(
     ax = fig.add_subplot(spec[5:8, 0:5])
 
     for i in range(rmse_bagging.shape[0]):
-        (line,) = ax.plot(
-            rmse_bagging[i, :],
-            corr_bagging[i, :],
-            ".-",
-            label="$\\gamma = $ " + str(gamma_vals[i]),
-        )
+
+        gamma_exponent = np.log10(gamma_vals[i])
+ 
+        if gamma_exponent.is_integer():
+            if gamma_exponent == 0 or gamma_exponent == 1: # if gamma=1 or gamma=10
+                (line,) = ax.plot(
+                    rmse_bagging[i, :],
+                    rmse_PA_bagging[i, :],
+                    ".-",
+                    label="$\\gamma = {}$ ".format(gamma_vals[i]),
+                )
+            elif gamma_exponent > 1:
+                (line,) = ax.plot(
+                    rmse_bagging[i, :],
+                    rmse_PA_bagging[i, :],
+                    ".-",
+                    label="$\\gamma = 10^{}$ ".format(int(gamma_exponent)),
+                )
+        else:
+            (line,) = ax.plot(
+                rmse_bagging[i, :],
+                rmse_PA_bagging[i, :],
+                ".-",
+                label="$\\gamma = {}$ ".format(gamma_vals[i]),
+            )
+                
         ax.plot(
             rmse_bagging[i, 0],
-            corr_bagging[i, 0],
+            rmse_PA_bagging[i, 0],
             color=line.get_color(),
             marker="o",
-            markersize=9,
+            markersize=8,
         )
     # plot ideal vector
     #     if len(h_anchors) == 0:
+    
+    ''' First, find the most common optimal pair (gamma, lambda)
+    across the different bootstraps and plot the mean RMSE/RMSE_PA for that pair.
+    It might not correspond to the min RMSE/RMSE_PA.
+    This is done in the same way (using mode) for the ideal vector, 
+    the optimal ridge and the optimal anchor solutions.'''
     ax.plot(
         rmse_bagging[
             iv1[0].astype(int),
             iv1[1].astype(int),
         ],
-        corr_bagging[
+        rmse_PA_bagging[
             iv2[0].astype(int),
             iv2[1].astype(int),
         ],
         "k^",
-        markersize=8,
+        markersize=7,
         label="Ideal vector",
     )
     ax.plot(
         rmse_bagging[0, i2_ridge],
-        corr_bagging[0, i2_ridge],
-        "ko",
-        markersize=9,
+        rmse_PA_bagging[0, i2_ridge],
+        "ks",
+        markersize=7,
         label="Ridge (optimal)",
     )
     ax.plot(
         rmse_bagging[i1, i2],
-        corr_bagging[i1, i2],
-        "ks",
-        markersize=8,
+        rmse_PA_bagging[i1, i2],
+        "ko",
+        markersize=7,
         label="Anchor (optimal)",
     )
 
-    #     ax.set_xscale("log")
+    # ax.set_xscale("log")
+    # ax.set_yscale("log")
     #     ticks = [0.6, 0.8, 1, 2, 3, 4, 5, 6, 7]
     #     ax.set_xticks(ticks)
     #     ax.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
     ax.set_xlabel(
-        "Root mean squared error (RMSE) (" u"\N{DEGREE SIGN}C)",
+        "Root mean squared error ($RMSE$) (" u"\N{DEGREE SIGN}C)",
         fontsize=params["axes.labelsize"],
     )
     ax.set_ylabel(
-        "Linear correlation (residuals, anchor)",
+        "$RMSE_{\Pi_{\mathbf{A}}}$ (error explained by $A$)",
         fontsize=params["axes.labelsize"],
     )
 
@@ -1717,56 +2497,96 @@ def plot_all_v2(
     label_panel(ax, "E")
 
     ax = fig.add_subplot(spec[5:8, 5:10])
-    for i in range(rmse_bagging.shape[0]):
-        (line,) = ax.plot(
-            rmse_bagging[i, :],
-            mi_bagging[i, :],
-            ".-",
-            label="$\\gamma = $ " + str(gamma_vals[i]),
+    if len(h_anchors) == 0: # plot correlation
+        for i in range(rmse_bagging.shape[0]):
+            (line,) = ax.plot(
+                rmse_bagging[i, :],
+                corr_bagging[i, :],
+                ".-",
+                label="$\\gamma = $ " + str(gamma_vals[i]),
+            )
+            ax.plot(
+                rmse_bagging[i, 0],
+                corr_bagging[i, 0],
+                color=line.get_color(),
+                marker="o",
+                markersize=8,
+            )
+        ax.plot(
+            rmse_bagging[i1, i2],
+            corr_bagging[i1, i2], # corr for linear anchor and mi for nonlinear anchor
+            "ko",
+            markersize=7,
         )
         ax.plot(
-            rmse_bagging[i, 0],
-            mi_bagging[i, 0],
-            color=line.get_color(),
-            marker="o",
-            markersize=9,
+            rmse_bagging[0, i2_ridge],
+            corr_bagging[0, i2_ridge],
+            "ks",
+            markersize=7,
         )
-    ax.plot(
-        rmse_bagging[i1, i2],
-        mi_bagging[i1, i2],
-        "ks",
-        markersize=8,
-    )
-    ax.plot(
-        rmse_bagging[0, i2_ridge],
-        mi_bagging[0, i2_ridge],
-        "ko",
-        markersize=9,
-    )
-    #     ax.set_yscale("log")
-    #     ticks = [0.6, 0.8, 1, 2, 3, 4, 5, 6, 7]
-    #     ax.set_xticks(ticks)
-    #     ax.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
-    ax.set_xlabel(
-        "Root mean squared error (RMSE) (" u"\N{DEGREE SIGN}C)",
-        fontsize=params["axes.labelsize"],
-    )
-    ax.set_ylabel(
-        "Mutual information (residuals, anchor)",
-        fontsize=params["axes.labelsize"],
-    )
+        #     ax.set_yscale("log")
+        #     ticks = [0.6, 0.8, 1, 2, 3, 4, 5, 6, 7]
+        #     ax.set_xticks(ticks)
+        #     ax.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+        ax.set_xlabel(
+            "Root mean squared error ($RMSE$) (" u"\N{DEGREE SIGN}C)",
+            fontsize=params["axes.labelsize"],
+        )
+        ax.set_ylabel(
+            "Linear correlation (residuals, anchor)",
+            fontsize=params["axes.labelsize"],
+        )
+    else: # plot mutual information
+        for i in range(rmse_bagging.shape[0]):
+            (line,) = ax.plot(
+                rmse_bagging[i, :],
+                mi_bagging[i, :],
+                ".-",
+                label="$\\gamma = $ " + str(gamma_vals[i]),
+            )
+            ax.plot(
+                rmse_bagging[i, 0],
+                mi_bagging[i, 0],
+                color=line.get_color(),
+                marker="o",
+                markersize=8,
+            )
+        ax.plot(
+            rmse_bagging[i1, i2],
+            mi_bagging[i1, i2], 
+            "ko",
+            markersize=7,
+        )
+        ax.plot(
+            rmse_bagging[0, i2_ridge],
+            mi_bagging[0, i2_ridge],
+            "ks",
+            markersize=7,
+        )
+        #     ax.set_yscale("log")
+        #     ticks = [0.6, 0.8, 1, 2, 3, 4, 5, 6, 7]
+        #     ax.set_xticks(ticks)
+        #     ax.get_xaxis().set_major_formatter(matplotlib.ticker.ScalarFormatter())
+        ax.set_xlabel(
+            "Root mean squared error ($RMSE$) (" u"\N{DEGREE SIGN}C)",
+            fontsize=params["axes.labelsize"],
+        )
+        ax.set_ylabel(
+            "Mutual information (residuals, anchor)",
+            fontsize=params["axes.labelsize"],
+        )
 
     # plot ideal vector
     #     if len(h_anchors) == 1:
-    ax.plot(
-        rmse_bagging[
-            iv1[0].astype(int),
-            iv1[1].astype(int),
-        ],
-        mi_bagging[iv2[0].astype(int), iv2[1]].astype(int),
-        "k^",
-        markersize=8,
-    )
+    # ax.plot(
+    #     rmse_bagging[
+    #         iv1[0].astype(int),
+    #         iv1[1].astype(int),
+    #     ],
+    #     corr_bagging[iv2[0].astype(int), iv2[1]].astype(int),
+    #     "k^", color = "blue",
+    #     markersize=7,
+    # )
     label_panel(ax, "F")
 
     """ Plot HT results """

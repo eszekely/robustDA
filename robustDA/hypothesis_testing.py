@@ -5,6 +5,7 @@ import sys
 from tqdm import tqdm
 
 from copy import deepcopy
+
 # from sklearn.preprocessing import StandardScaler
 from scipy.stats import spearmanr
 
@@ -29,10 +30,12 @@ def test_DA(params_climate, params_anchor):
     p = grid[0] * grid[1]
 
     rmse_train_lin = np.zeros([B, len(gamma_vals), cv_vals])
+    rmse_PA_train_lin = np.zeros([B, len(gamma_vals), cv_vals])
     corr_train_lin = np.zeros([B, len(gamma_vals), cv_vals])
     mi_train_lin = np.zeros([B, len(gamma_vals), cv_vals])
 
     rmse_test_lin = np.zeros([B, len(gamma_vals), cv_vals])
+    rmse_PA_test_lin = np.zeros([B, len(gamma_vals), cv_vals])
     corr_test_lin = np.zeros([B, len(gamma_vals), cv_vals])
     mi_test_lin = np.zeros([B, len(gamma_vals), cv_vals])
 
@@ -53,11 +56,13 @@ def test_DA(params_climate, params_anchor):
     lambda_opt_ridge_lin = np.zeros([B, 1])
 
     rmse_train_nonlin = np.zeros([B, len(gamma_vals), cv_vals])
+    rmse_PA_train_nonlin = np.zeros([B, len(gamma_vals), cv_vals])
     corr_train_nonlin = np.zeros([B, len(gamma_vals), cv_vals])
     corr2_train_nonlin = np.zeros([B, len(gamma_vals), cv_vals])
     mi_train_nonlin = np.zeros([B, len(gamma_vals), cv_vals])
 
     rmse_test_nonlin = np.zeros([B, len(gamma_vals), cv_vals])
+    rmse_PA_test_nonlin = np.zeros([B, len(gamma_vals), cv_vals])
     corr_test_nonlin = np.zeros([B, len(gamma_vals), cv_vals])
     corr2_test_nonlin = np.zeros([B, len(gamma_vals), cv_vals])
     mi_test_nonlin = np.zeros([B, len(gamma_vals), cv_vals])
@@ -72,7 +77,6 @@ def test_DA(params_climate, params_anchor):
     ind_lambda_opt_ridge_nonlin = np.zeros([B, 1])
     ind_vect_ideal_obj1_nonlin = np.zeros([B, 2])
     ind_vect_ideal_obj2_nonlin = np.zeros([B, 2])
-    ind_vect_ideal_obj3_nonlin = np.zeros([B, 2])
     gamma_opt_nonlin = np.zeros([B, 1])
     lambda_opt_nonlin = np.zeros([B, 1])
     lambda_opt_ridge_nonlin = np.zeros([B, 1])
@@ -107,7 +111,7 @@ def test_DA(params_climate, params_anchor):
             + "_spearman95_coefRaw"
         )
 
-    sys.stdout = open("./../output/logFiles/" + filename + ".log", "w")
+    sys.stdout = open("./../output/logFiles/" + filename + "_PA.log", "w")
 
     for b in tqdm(range(B)):
         print(
@@ -121,6 +125,7 @@ def test_DA(params_climate, params_anchor):
 
         (
             rmse_train_bag_lin,
+            rmse_PA_train_bag_lin,
             corr_train_bag_lin,
             mi_train_bag_lin,
             coef_raw_bag_opt_lin,
@@ -128,6 +133,7 @@ def test_DA(params_climate, params_anchor):
             coef_raw_bag_opt_ridge_lin,
             coef_std_bag_opt_ridge_lin,
             rmse_test_bag_lin,
+            rmse_PA_test_bag_lin,
             corr_test_bag_lin,
             mi_test_bag_lin,
             ind_gamma_bag_opt_lin,
@@ -136,6 +142,7 @@ def test_DA(params_climate, params_anchor):
             ind_vect_ideal_obj1_bag_lin,
             ind_vect_ideal_obj2_bag_lin,
             rmse_train_bag_nonlin,
+            rmse_PA_train_bag_nonlin,
             corr_train_bag_nonlin,
             corr2_train_bag_nonlin,
             mi_train_bag_nonlin,
@@ -144,6 +151,7 @@ def test_DA(params_climate, params_anchor):
             coef_raw_bag_opt_ridge_nonlin,
             coef_std_bag_opt_ridge_nonlin,
             rmse_test_bag_nonlin,
+            rmse_PA_test_bag_nonlin,
             corr_test_bag_nonlin,
             corr2_test_bag_nonlin,
             mi_test_bag_nonlin,
@@ -152,7 +160,6 @@ def test_DA(params_climate, params_anchor):
             ind_lambda_bag_opt_ridge_nonlin,
             ind_vect_ideal_obj1_bag_nonlin,
             ind_vect_ideal_obj2_bag_nonlin,
-            ind_vect_ideal_obj3_bag_nonlin,
         ) = cross_validation_gamma_lambda(
             modelsDataList,
             modelsInfoFrame,
@@ -203,10 +210,12 @@ def test_DA(params_climate, params_anchor):
         )
 
         rmse_train_lin[b, :, :] = rmse_train_bag_lin
+        rmse_PA_train_lin[b, :, :] = rmse_PA_train_bag_lin
         corr_train_lin[b, :, :] = corr_train_bag_lin
         mi_train_lin[b, :, :] = mi_train_bag_lin
 
         rmse_test_lin[b, :, :] = rmse_test_bag_lin
+        rmse_PA_test_lin[b, :, :] = rmse_PA_test_bag_lin
         corr_test_lin[b, :, :] = corr_test_bag_lin
         mi_test_lin[b, :, :] = mi_test_bag_lin
 
@@ -264,11 +273,13 @@ def test_DA(params_climate, params_anchor):
         )
 
         rmse_train_nonlin[b, :, :] = rmse_train_bag_nonlin
+        rmse_PA_train_nonlin[b, :, :] = rmse_PA_train_bag_nonlin
         corr_train_nonlin[b, :, :] = corr_train_bag_nonlin
         corr2_train_nonlin[b, :, :] = corr2_train_bag_nonlin
         mi_train_nonlin[b, :, :] = mi_train_bag_nonlin
 
         rmse_test_nonlin[b, :, :] = rmse_test_bag_nonlin
+        rmse_PA_test_nonlin[b, :, :] = rmse_PA_test_bag_nonlin
         corr_test_nonlin[b, :, :] = corr_test_bag_nonlin
         corr2_test_nonlin[b, :, :] = corr2_test_bag_nonlin
         mi_test_nonlin[b, :, :] = mi_test_bag_nonlin
@@ -290,7 +301,6 @@ def test_DA(params_climate, params_anchor):
 
         ind_vect_ideal_obj1_nonlin[b] = ind_vect_ideal_obj1_bag_nonlin
         ind_vect_ideal_obj2_nonlin[b] = ind_vect_ideal_obj2_bag_nonlin
-        ind_vect_ideal_obj3_nonlin[b] = ind_vect_ideal_obj3_bag_nonlin
 
         (
             alpha_per_bag_nonlin,
@@ -341,7 +351,7 @@ def test_DA(params_climate, params_anchor):
     if not os.path.isdir(dirname):
         os.makedirs(dirname)
 
-    with open(dirname + filename + ".pkl", "wb") as f:
+    with open(dirname + filename + "_valPA.pkl", "wb") as f:
         pickle.dump(
             [
                 params_climate,
@@ -362,9 +372,11 @@ def test_DA(params_climate, params_anchor):
                 y_test_pred_lin,
                 y_test_pred_ridge_lin,
                 rmse_train_lin,
+                rmse_PA_train_lin,
                 corr_train_lin,
                 mi_train_lin,
                 rmse_test_lin,
+                rmse_PA_test_lin,
                 corr_test_lin,
                 mi_test_lin,
                 alpha_bagging_lin,
@@ -377,16 +389,17 @@ def test_DA(params_climate, params_anchor):
                 lambda_opt_ridge_nonlin,
                 ind_vect_ideal_obj1_nonlin,
                 ind_vect_ideal_obj2_nonlin,
-                ind_vect_ideal_obj3_nonlin,
                 coef_raw_opt_nonlin,
                 coef_raw_opt_ridge_nonlin,
                 y_test_pred_nonlin,
                 y_test_pred_ridge_nonlin,
                 rmse_train_nonlin,
+                rmse_PA_train_nonlin,
                 corr_train_nonlin,
                 corr2_train_nonlin,
                 mi_train_nonlin,
                 rmse_test_nonlin,
+                rmse_PA_test_nonlin,
                 corr_test_nonlin,
                 corr2_test_nonlin,
                 mi_test_nonlin,
@@ -394,6 +407,7 @@ def test_DA(params_climate, params_anchor):
                 power_bagging_nonlin,
                 nb_models_bagging,
                 models,
+                modelsInfoFrame,
             ],
             f,
         )
@@ -423,7 +437,7 @@ def test_DA_per_bag(params_climate, models, dict_models, y_test_pred):
 
     print(test_models, flush=True)
 
-    """ For each model in the test set, build the null from the rest of the models,
+    """ For each model in the test set, build the null from the rest of the models in the test set,
     compute the threshold, then compute \alpha and \beta """
     for i in range(len(models)):
         if models[i] in test_models:

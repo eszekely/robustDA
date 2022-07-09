@@ -11,7 +11,7 @@ Parameters: >
                      esm-hist, esm-ssp585, esm-1pctCO2, hist-bgc, land-hist,
                      ssp534-over, ssp534-over-bgc, ssp585-bgc, 1pctCO2-bgc)
     Start date for CMIP6: 1850
-    Target: 1) forcing (from ERF files): total, total_anthropogenic, GHG, CO2,
+    Target: 1) forcing (from ERF files): total, total_anthropogenic, GHG, co2,
                                          aerosols, total_natural, volcanic, solar
             2) forced response (computed from the single forcing runs):
                                          hist-aer, hist-GHG, hist-nat
@@ -22,10 +22,10 @@ variables: [tas]
 scenarios: [historical, piControl] 
 startDate: 1850
 endDate: 2014
-target: GHG
-anchor: aerosols
+target: aerosols
+anchor: co2
 
-gamma: [1, 5, 10, 50, 100, 500, 1000, 5000, 10000] # list of gamma values
+gamma: [1, 2, 5, 10, 100, 1000, 10000, 100000, 1000000] # list of gamma values
 # gamma: [1, 10, 100, 1000, 10000] # list of gamma values
 # gamma: [1, 100, 10000] # list of gamma values
 nonlinear_anchors: ['square'] # list of nonlinear anchors

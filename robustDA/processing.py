@@ -45,7 +45,7 @@ def split_train_test(
 
         """ Split the models """
         trainModels = np.sort(
-            list(random.sample(models, int(np.round(percTrain * len(models)))))
+            list(random.sample(models, int(np.ceil(percTrain * len(models)))))
         )
 
         trainFiles = [
@@ -102,7 +102,7 @@ def split_train_test(
 
         """ Split the models """
         trainModels = np.sort(
-            list(random.sample(models, int(np.round(percTrain * len(models)))))
+            list(random.sample(models, int(np.ceil(percTrain * len(models)))))
         )
         trainFiles = [
             modelsDataList[i].filename
