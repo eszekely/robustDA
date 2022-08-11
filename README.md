@@ -41,3 +41,5 @@ conda deactivate
 ## References
 
 ## Data
+
+The CMIP6 (Coupled Model Intercomparison Project, Phase 6) data is available at [https://esgf-node.llnl.gov/projects/cmip6/](https://esgf-node.llnl.gov/projects/cmip6/).
