@@ -55,9 +55,9 @@ def plotMapCartopy(dataMap, cLim=None, title=None, filename=None):
     cbar = fig.colorbar(
         h, cax=cbar_axes, orientation="horizontal", drawedges=False
     )
-    cbar.set_label("Temperature", fontsize=12)
+    # cbar.set_label("Temperature", fontsize=12)
     cbar.ax.locator_params(nbins=3)
-    cbar.ax.tick_params(labelsize=params["xtick.labelsize"])
+    cbar.ax.tick_params(labelsize=params["xtick.labelsize"] + 10)
     cbar.outline.set_visible(False)
 
     if title is not None:
@@ -102,7 +102,8 @@ def plotMapCartopy_subplots(
     #         0.007,
     #     ]  # [left,bottom,width,height] [0.18, 0.05, 0.159, 0.03]
 
-    cbar_pos = [ax_pos.x0 + dx, ax_pos.y0 + dy, 0.2, 0.006]
+    # cbar_pos = [ax_pos.x0 + dx, ax_pos.y0 + dy, 0.2, 0.006]
+    cbar_pos = [ax_pos.x0 + dx, ax_pos.y0 + dy, 0.19, 0.005] # for the small figures
     cbar_axes = fig.add_axes(cbar_pos)
     cbar = fig.colorbar(
         h,
@@ -1272,6 +1273,7 @@ def plot_Pareto(
     ind_lambda_opt_ridge,
     ind_vect_ideal_obj1,
     ind_vect_ideal_obj2,
+    formatFig,
     filename=None,
 ):
 
@@ -1296,7 +1298,7 @@ def plot_Pareto(
         ]
     )
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 5.2))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13.5, 4.5))
 
     #     _, _, vect_ideal, vect_Nadir = choose_gamma_lambda_pareto(
     #         rmse, mi, maxX=False, maxY=False,)
@@ -1340,7 +1342,7 @@ def plot_Pareto(
         rmse_PA_bagging[i1, i2],
         "ks",
     )
-    ax1.plot(
+    ideal_vector, = ax1.plot(
         rmse_bagging[
             iv1[0].astype(int),
             iv1[1].astype(int),
@@ -1351,21 +1353,18 @@ def plot_Pareto(
         ],
         "k^",
         markersize=7,
-        label="Ideal vector",
     )
-    ax1.plot(
+    ridge_optimal, = ax1.plot(
         rmse_bagging[0, i2_ridge],
         rmse_PA_bagging[0, i2_ridge],
         "ks",
         markersize=7,
-        label="Ridge (optimal)",
     )
-    ax1.plot(
+    anchor_optimal, = ax1.plot(
         rmse_bagging[i1, i2],
         rmse_PA_bagging[i1, i2],
         "ko",
         markersize=7,
-        label="Anchor (optimal)",
     )
 
     #     ax1.set_xscale("log")
@@ -1380,7 +1379,12 @@ def plot_Pareto(
         "$RMSE_{\Pi_{\mathbf{A}}}$ (error explained by $A$)",
         fontsize=params["axes.labelsize"],
     )
-    ax1.legend(fontsize=params["axes.labelsize"] - 4)
+    
+    legend1 = ax1.legend(fontsize=params["axes.labelsize"] - 2, loc = "upper right")
+    legend2 = ax1.legend([ideal_vector,ridge_optimal, anchor_optimal],['Ideal vector','Ridge (optimal)', 'Anchor (optimal)'], loc='upper left', fontsize=params["axes.labelsize"] - 2)
+    ax1.add_artist(legend1)
+    
+    # ax1.legend(fontsize=params["axes.labelsize"] - 4)
 
     if len(h_anchors) == 0: # plot correlation
         for i in range(rmse_bagging.shape[0]):
@@ -1418,7 +1422,7 @@ def plot_Pareto(
             fontsize=params["axes.labelsize"],
         )
         ax2.set_ylabel(
-            "Linear correlation (residuals, anchor)",
+            "Linear correlation (residuals, $A$)",
             fontsize=params["axes.labelsize"],
         )
     else: # plot mutual information
@@ -1457,7 +1461,7 @@ def plot_Pareto(
             fontsize=params["axes.labelsize"],
         )
         ax2.set_ylabel(
-            "Mutual information (residuals, anchor)",
+            "Mutual information (residuals, $A$)",
             fontsize=params["axes.labelsize"],
         )
 
@@ -1466,7 +1470,7 @@ def plot_Pareto(
     if filename:
         if not os.path.isdir("./../output/figures/"):
             os.makedirs("./../output/figures/")
-        fig.savefig("./../output/figures/" + filename, bbox_inches="tight")
+        fig.savefig("./../output/figures/" + filename, format = formatFig, bbox_inches="tight")
 
 
 def plot_Pareto_3(
@@ -1720,7 +1724,7 @@ def plot_all(
     residuals = (yt - yp).reshape(-1)
     #     residuals_ridge = (yt - yp_ridge).reshape(-1)
 
-    fig = plt.figure(figsize=(18, 15)) 
+    fig = plt.figure(figsize=(6.7, 5.3))
     spec = gridspec.GridSpec(nrows=7, ncols=10)
 
     #     """ --- RIDGE --- """
@@ -2082,6 +2086,7 @@ def plot_all_v2(
     ind_vect_ideal_obj2,
     alpha_bagging,
     power_bagging,
+    formatFig,
     filename=None,
 ):
 
@@ -2192,7 +2197,7 @@ def plot_all_v2(
     residuals = (yt - yp).reshape(-1)
     #     residuals_ridge = (yt - yp_ridge).reshape(-1)
 
-    fig = plt.figure(figsize=(15, 20))
+    fig = plt.figure(figsize=(13.5, 17))
     spec = gridspec.GridSpec(nrows=10, ncols=10)
 
     #     """ --- RIDGE --- """
@@ -2318,7 +2323,7 @@ def plot_all_v2(
     ax.plot(x, x, "k", linestyle="solid")
     ax.set_xlabel("True target $Y$ (" + target[:3].upper() + ")")
     ax.set_ylabel(
-        r"Predicted target $\widehat{Y}$ (" + target[:3].upper() + ")"
+        r"Predicted target $\widehat{Y}$"
     )
     ax.set_title(
         "Prediction: $RMSE$ = "
@@ -2451,7 +2456,7 @@ def plot_all_v2(
     It might not correspond to the min RMSE/RMSE_PA.
     This is done in the same way (using mode) for the ideal vector, 
     the optimal ridge and the optimal anchor solutions.'''
-    ax.plot(
+    ideal_vector, = ax.plot(
         rmse_bagging[
             iv1[0].astype(int),
             iv1[1].astype(int),
@@ -2462,21 +2467,21 @@ def plot_all_v2(
         ],
         "k^",
         markersize=7,
-        label="Ideal vector",
+        # label="Ideal vector",
     )
-    ax.plot(
+    ridge_optimal, = ax.plot(
         rmse_bagging[0, i2_ridge],
         rmse_PA_bagging[0, i2_ridge],
         "ks",
         markersize=7,
-        label="Ridge (optimal)",
+        # label="Ridge (optimal)",
     )
-    ax.plot(
+    anchor_optimal, = ax.plot(
         rmse_bagging[i1, i2],
         rmse_PA_bagging[i1, i2],
         "ko",
         markersize=7,
-        label="Anchor (optimal)",
+        # label="Anchor (optimal)",
     )
 
     # ax.set_xscale("log")
@@ -2493,8 +2498,10 @@ def plot_all_v2(
         fontsize=params["axes.labelsize"],
     )
 
-    ax.legend(fontsize=params["axes.labelsize"] - 4)
-    
+    legend1 = ax.legend(fontsize=params["axes.labelsize"] - 2, loc = "upper right")
+    legend2 = ax.legend([ideal_vector,ridge_optimal, anchor_optimal],['Ideal vector','Ridge (optimal)', 'Anchor (optimal)'], loc='upper left', fontsize=params["axes.labelsize"] - 2)
+    ax.add_artist(legend1)
+
     label_panel(ax, "E")
 
     ax = fig.add_subplot(spec[5:8, 5:10])
@@ -2534,7 +2541,7 @@ def plot_all_v2(
             fontsize=params["axes.labelsize"],
         )
         ax.set_ylabel(
-            "Linear correlation (residuals, anchor)",
+            "Linear correlation (residuals, $A$)",
             fontsize=params["axes.labelsize"],
         )
     else: # plot mutual information
@@ -2573,7 +2580,7 @@ def plot_all_v2(
             fontsize=params["axes.labelsize"],
         )
         ax.set_ylabel(
-            "Mutual information (residuals, anchor)",
+            "Mutual information (residuals, $A$)",
             fontsize=params["axes.labelsize"],
         )
 
@@ -2630,7 +2637,7 @@ def plot_all_v2(
     #     label_panel(ax3,'C')
     #     label_panel(ax4,'D')
 
-    plt.subplots_adjust(wspace=5, hspace=1.5)
+    plt.subplots_adjust(wspace=5, hspace=2)
 
     if filename:
         if not os.path.isdir("./../output/figures/"):
@@ -2638,7 +2645,7 @@ def plot_all_v2(
         fig.savefig(
             "./../output/figures/" + filename,
             bbox_inches="tight",
-            format="pdf",
+            format=formatFig,
         )
 
 
@@ -2793,7 +2800,7 @@ def plot_Pareto_corr(
         fontsize=params["axes.labelsize"],
     )
 
-    plt.subplots_adjust(wspace=0.25)
+    plt.subplots_adjust(wspace=0.5)
 
     if filename:
         if not os.path.isdir("./../output/figures/"):
@@ -2806,12 +2813,12 @@ def label_panel(
     letter,
     *,
     offset_left=0.6,
-    offset_up=0.3,
+    offset_up=0.2,
     prefix="",
     postfix="",
     **font_kwds
 ):
-    kwds = dict(fontsize=20, fontweight="heavy")
+    kwds = dict(fontsize=19, fontweight="heavy")
     kwds.update(font_kwds)
     # this mad looking bit of code says that we should put the code offset a certain distance in
     # inches (using the fig.dpi_scale_trans transformation) from the top left of the frame
@@ -2824,6 +2831,11 @@ def label_panel(
 
 
 def plot_motiv_example():
+    
+    params["axes.titlesize"] = 23
+    params["axes.labelsize"] = 23
+    plt.rcParams.update(params)
+    
     overview_NOIV = pd.read_csv(
         "./../data/local/motivatingExample/00_overview_NOIV.txt",
         sep=";",
@@ -2854,10 +2866,13 @@ def plot_motiv_example():
         header=0,
     )
 
-    fig, axes = plt.subplots(3, 3, figsize=(22, 22))
+    fig, axes = plt.subplots(3, 3, figsize=(18.5, 18.5))
     #     fig, axs = plt.subplot_mosaic([['a)', 'c)'], ['b)', 'c)'], ['d)', 'd)']],
     #                               constrained_layout=True)
 
+    ax_let_left = -0.11
+    ax_let_up = 1.05
+    
     """ a. No Interventions """
     ax = axes[0, 0]
     ax.plot(
@@ -2887,10 +2902,10 @@ def plot_motiv_example():
 
     ax.set_ylim([-5, 10])
     ax.set_yticks([-5, 0, 5, 10])
-    ax.legend(fontsize=params["axes.labelsize"] - 6)
+    ax.legend(fontsize=params["axes.labelsize"] - 2)
     ax.set_xlabel("Year", fontsize=params["axes.labelsize"])
     ax.set_ylabel(
-        "Global Mean Temperature Anomaly (°C)",
+        "Global Mean Temp Anomaly (°C)",
         fontsize=params["axes.labelsize"],
     )
     ax.set_title("No Interventions")
@@ -2898,11 +2913,11 @@ def plot_motiv_example():
         -20 / 72, 7 / 72, fig.dpi_scale_trans
     )
     ax.text(
-        -0.07,
-        1.0,
+        ax_let_left,
+        ax_let_up,
         "(a)",
         transform=ax.transAxes + trans,
-        fontsize=16,
+        fontsize=params["axes.titlesize"],
         va="bottom",
         fontfamily="serif",
     )
@@ -2963,10 +2978,10 @@ def plot_motiv_example():
 
     ax.set_ylim([-5, 10])
     ax.set_yticks([-5, 0, 5, 10])
-    ax.legend(fontsize=params["axes.labelsize"] - 6)
+    ax.legend(fontsize=params["axes.labelsize"] - 2)
     ax.set_xlabel("Year", fontsize=params["axes.labelsize"])
     ax.set_ylabel(
-        "Global Mean Temperature Anomaly (°C)",
+        "Global Mean Temp Anomaly (°C)",
         fontsize=params["axes.labelsize"],
     )
     ax.set_title("Small Interventions (Training data)")
@@ -2974,11 +2989,11 @@ def plot_motiv_example():
         -20 / 72, 7 / 72, fig.dpi_scale_trans
     )
     ax.text(
-        -0.07,
-        1.0,
+        ax_let_left,
+        ax_let_up,
         "(b)",
         transform=ax.transAxes + trans,
-        fontsize=16,
+        fontsize=params["axes.titlesize"],
         va="bottom",
         fontfamily="serif",
     )
@@ -3043,10 +3058,10 @@ def plot_motiv_example():
     #     ax.set_xlim([500, 2500])
     ax.set_ylim([-5, 10])
     ax.set_yticks([-5, 0, 5, 10])
-    ax.legend(fontsize=params["axes.labelsize"] - 6, ncol=2)
+    ax.legend(fontsize=params["axes.labelsize"] - 2)
     ax.set_xlabel("Year", fontsize=params["axes.labelsize"])
     ax.set_ylabel(
-        "Global Mean Temperature Anomaly (°C)",
+        "Global Mean Temp Anomaly (°C)",
         fontsize=params["axes.labelsize"],
     )
     ax.set_title("Strong Interventions (Test data)")
@@ -3054,11 +3069,11 @@ def plot_motiv_example():
         -20 / 72, 7 / 72, fig.dpi_scale_trans
     )
     ax.text(
-        -0.07,
-        1.0,
+        ax_let_left,
+        ax_let_up,
         "(c)",
         transform=ax.transAxes + trans,
-        fontsize=16,
+        fontsize=params["axes.titlesize"],
         va="bottom",
         fontfamily="serif",
     )
@@ -3100,18 +3115,18 @@ def plot_motiv_example():
         ha="center",
         va="center",
         rotation=0,
-        size=16,
+        size=20,
         bbox=dict(boxstyle="round, pad=0.4", fc="white", ec="lightgrey", lw=1),
     )
     trans = mtransforms.ScaledTranslation(
         -20 / 72, 7 / 72, fig.dpi_scale_trans
     )
     ax.text(
-        -0.07,
-        1.0,
+        ax_let_left,
+        ax_let_up,
         "(d)",
         transform=ax.transAxes + trans,
-        fontsize=16,
+        fontsize=params["axes.titlesize"],
         va="bottom",
         fontfamily="serif",
     )
@@ -3152,18 +3167,18 @@ def plot_motiv_example():
         ha="center",
         va="center",
         rotation=0,
-        size=16,
+        size=20,
         bbox=dict(boxstyle="round, pad=0.4", fc="white", ec="lightgrey", lw=1),
     )
     trans = mtransforms.ScaledTranslation(
         -20 / 72, 7 / 72, fig.dpi_scale_trans
     )
     ax.text(
-        -0.07,
-        1.0,
+        ax_let_left,
+        ax_let_up,
         "(g)",
         transform=ax.transAxes + trans,
-        fontsize=16,
+        fontsize=params["axes.titlesize"],
         va="bottom",
         fontfamily="serif",
     )
@@ -3222,18 +3237,18 @@ def plot_motiv_example():
         ha="center",
         va="center",
         rotation=0,
-        size=16,
+        size=20,
         bbox=dict(boxstyle="round, pad=0.4", fc="white", ec="lightgrey", lw=1),
     )
     trans = mtransforms.ScaledTranslation(
         -20 / 72, 7 / 72, fig.dpi_scale_trans
     )
     ax.text(
-        -0.07,
-        1.0,
+        ax_let_left,
+        ax_let_up,
         "(e)",
         transform=ax.transAxes + trans,
-        fontsize=16,
+        fontsize=params["axes.titlesize"],
         va="bottom",
         fontfamily="serif",
     )
@@ -3293,18 +3308,18 @@ def plot_motiv_example():
         ha="center",
         va="center",
         rotation=0,
-        size=16,
+        size=20,
         bbox=dict(boxstyle="round, pad=0.4", fc="white", ec="lightgrey", lw=1),
     )
     trans = mtransforms.ScaledTranslation(
         -20 / 72, 7 / 72, fig.dpi_scale_trans
     )
     ax.text(
-        -0.07,
-        1.0,
+        ax_let_left,
+        ax_let_up,
         "(h)",
         transform=ax.transAxes + trans,
-        fontsize=16,
+        fontsize=params["axes.titlesize"],
         va="bottom",
         fontfamily="serif",
     )
@@ -3334,7 +3349,7 @@ def plot_motiv_example():
     ax.set_xlabel("Solar anchor (Wm$^{-2}$)")
     ax.set_ylabel("Prediction residuals")
     ax.set_title(
-        "Strong Interventions (Residual correlation w/ Anchor)",
+        "Strong Interventions \n (Residual correlation w/ Anchor)",
     )
     res = pd.concat(
         [
@@ -3358,18 +3373,18 @@ def plot_motiv_example():
         ha="center",
         va="center",
         rotation=0,
-        size=16,
+        size=20,
         bbox=dict(boxstyle="round, pad=0.4", fc="white", ec="lightgrey", lw=1),
     )
     trans = mtransforms.ScaledTranslation(
         -20 / 72, 7 / 72, fig.dpi_scale_trans
     )
     ax.text(
-        -0.07,
-        1.0,
+        ax_let_left,
+        ax_let_up,
         "(f)",
         transform=ax.transAxes + trans,
-        fontsize=16,
+        fontsize=params["axes.titlesize"],
         va="bottom",
         fontfamily="serif",
     )
@@ -3397,7 +3412,7 @@ def plot_motiv_example():
     ax.set_ylim([-6, 6])
     ax.set_xlabel("Solar anchor (Wm$^{-2}$)")
     ax.set_ylabel("Prediction residuals")
-    ax.set_title("Strong Interventions (Residual correlation w/ Anchor)")
+    ax.set_title("Strong Interventions \n (Residual correlation w/ Anchor)")
     res = pd.concat(
         [
             pred_cntl["y_cntl"] - pred_cntl["yhat_cntl_A100"],
@@ -3420,28 +3435,28 @@ def plot_motiv_example():
         ha="center",
         va="center",
         rotation=0,
-        size=16,
+        size=20,
         bbox=dict(boxstyle="round, pad=0.4", fc="white", ec="lightgrey", lw=1),
     )
     trans = mtransforms.ScaledTranslation(
         -20 / 72, 7 / 72, fig.dpi_scale_trans
     )
     ax.text(
-        -0.07,
-        1.0,
+        ax_let_left,
+        ax_let_up,
         "(i)",
         transform=ax.transAxes + trans,
-        fontsize=16,
+        fontsize=params["axes.titlesize"],
         va="bottom",
         fontfamily="serif",
     )
 
-    plt.subplots_adjust(hspace=0.25)
+    plt.subplots_adjust(hspace=0.4, wspace=0.25)
 
     filename = "motivating_example.pdf"
     if filename:
         if not os.path.isdir("./../output/figures/"):
             os.makedirs("./../output/figures/")
-        fig.savefig("./../output/figures/" + filename, bbox_inches="tight")
+        fig.savefig("./../output/figures/" + filename, format = "pdf", bbox_inches="tight")
 
     plt.show()
